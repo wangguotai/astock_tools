@@ -45,7 +45,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     getCurrentCode().then(sendResponse);
     return true;
   } else if (msg.type === 'FORCE_PUSH') {
-    // 重置节流状态，允许立即推送
     pushState.lastQuotePush = {};
     pushState.lastOrderbookPush = {};
     pushState.pushedKline.clear();
@@ -53,7 +52,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ status: 'ok' });
   }
 
-  return true;
+  return false;
 });
 
 /** 处理拦截到的数据 */

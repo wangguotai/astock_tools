@@ -1,13 +1,8 @@
 /**
- * 内容脚本注入器 - 注入interceptor到MAIN world + 转发消息给background
+ * 内容脚本注入器 - 在隔离世界接收拦截数据并转发给background
+ * interceptor.ts 通过 manifest.json 的 world: "MAIN" 独立注入到页面上下文
  */
 import { STOCK_PAGE_REGEX } from '@shared/constants';
-
-// 注入interceptor.ts到MAIN world
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('src/content/interceptor.ts');
-script.onload = () => script.remove();
-(document.head || document.documentElement).appendChild(script);
 
 // 从页面接收拦截到的数据，转发给background
 window.addEventListener('message', (event) => {

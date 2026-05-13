@@ -18,6 +18,9 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  build: {
+    minify: false,
+  },
   server: {
     port: 8082,
     cors: true,
