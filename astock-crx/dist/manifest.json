@@ -15,13 +15,17 @@
     "http://127.0.0.1:17320/*"
   ],
   "background": {
-    "service_worker": "src/background/index.ts",
+    "service_worker": "service-worker-loader.js",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["https://stockpage.10jqka.com.cn/*"],
-      "js": ["src/content/injector.ts"],
+      "js": [
+        "assets/injector.ts-Cuu-RDYm.js"
+      ],
+      "matches": [
+        "https://stockpage.10jqka.com.cn/*"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -33,5 +37,16 @@
       "128": "icons/icon128.png"
     }
   },
-  "options_page": "src/options/index.html"
+  "options_page": "src/options/index.html",
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "https://stockpage.10jqka.com.cn/*"
+      ],
+      "resources": [
+        "assets/injector.ts-Cuu-RDYm.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ]
 }

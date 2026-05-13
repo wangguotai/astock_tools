@@ -1,15 +1,15 @@
 /**
- * inject.js - 注入到同花顺页面的桥接脚本
- * 将interceptor.js注入MAIN world，同时转发消息给background
+ * 内容脚本注入器 - 注入interceptor到MAIN world + 转发消息给background
  */
+import { STOCK_PAGE_REGEX } from '@shared/constants';
 
-// 注入interceptor.js到MAIN world
+// 注入interceptor.ts到MAIN world
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('content_scripts/interceptor.js');
+script.src = chrome.runtime.getURL('src/content/interceptor.ts');
 script.onload = () => script.remove();
 (document.head || document.documentElement).appendChild(script);
 
-// 从页面接收拦截到的数据，转发给background service worker
+// 从页面接收拦截到的数据，转发给background
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (event.data.type !== 'ASTOCK_XHR_DATA' && event.data.type !== 'ASTOCK_FETCH_DATA') return;
