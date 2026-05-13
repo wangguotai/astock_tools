@@ -5,6 +5,10 @@ pub mod trade_repo;
 pub mod position_repo;
 pub mod watch_repo;
 pub mod alert_repo;
+pub mod tick_repo;
+pub mod orderbook_repo;
+pub mod moneyflow_repo;
+pub mod quote_snapshot_repo;
 
 use rusqlite::Connection;
 use std::path::PathBuf;

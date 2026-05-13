@@ -92,6 +92,13 @@ pub enum Commands {
         #[command(subcommand)]
         command: MonitorCommands,
     },
+
+    /// 启动数据接收端 (Chrome插件推送)
+    Receiver {
+        /// 监听端口
+        #[arg(short, long, default_value_t = 17320)]
+        port: u16,
+    },
 }
 
 #[derive(Subcommand)]

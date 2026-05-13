@@ -7,6 +7,7 @@ mod display;
 mod error;
 mod models;
 mod monitor;
+mod receiver;
 
 use cli::{Cli, Commands, BacktestCommands, TradeCommands, PositionCommands, WatchCommands, AlertCommands, MonitorCommands};
 use clap::Parser;
@@ -470,6 +471,10 @@ async fn main() -> anyhow::Result<()> {
                     monitor::watcher::start_monitor(interval).await?;
                 }
             }
+        }
+
+        Commands::Receiver { port } => {
+            receiver::start_server(port).await?;
         }
     }
 

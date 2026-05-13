@@ -39,5 +39,9 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # Desktop notifications
 notify-rust = "4"
 
+# HTTP server (for Chrome extension receiver)
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+
 # Ctrl+C handling
 ctrlc = "3"
