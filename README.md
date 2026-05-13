@@ -11,6 +11,7 @@
 | Phase 3 | 策略回测引擎 | ✅ 已完成 |
 | Phase 4 | 交易记录 + 持仓管理 | ✅ 已完成 |
 | Phase 5 | 实时监控 + 预警 | ✅ 已完成 |
+| Phase 6 | Chrome插件 + 同花顺数据桥接 | ✅ 已完成 |
 
 ## 安装
 
@@ -335,6 +336,51 @@ astock monitor start --interval 60
 - 涨跌幅超过3%时发送 macOS 桌面通知
 - 按 `Ctrl+C` 优雅退出
 
+### 数据接收端 (Chrome插件桥接)
+
+启动本地HTTP服务接收Chrome插件从同花顺网页端截取的实时数据：
+
+```bash
+# 启动接收端 (默认端口17320)
+astock receiver
+
+# 指定端口
+astock receiver --port 8080
+```
+
+接收端API：
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/quote` | POST | 接收实时行情 |
+| `/api/v1/kline` | POST | 接收K线数据 |
+| `/api/v1/tick` | POST | 接收分时成交 |
+| `/api/v1/orderbook` | POST | 接收盘口5档 |
+| `/api/v1/moneyflow` | POST | 接收资金流向 |
+| `/api/v1/status` | GET | 健康检查 |
+| `/api/v1/watchlist` | GET | 返回自选股列表 |
+
+### Chrome插件 (astock-crx)
+
+从同花顺网页端截取实时数据并推送到astock接收端：
+
+**安装**：
+1. Chrome打开 `chrome://extensions/`
+2. 开启"开发者模式"
+3. 点击"加载已解压的扩展程序"，选择 `astock-crx/` 目录
+
+**使用**：
+1. 启动astock接收端：`astock receiver`
+2. 打开同花顺股票页面：`https://stockpage.10jqka.com.cn/002202/`
+3. 插件自动拦截页面数据API，归一化后推送到本地接收端
+4. 点击插件图标查看连接状态和推送记录
+
+**数据节流**：
+- 行情：价格变化或10秒间隔推送
+- 分时成交：5秒批量推送
+- 盘口：5秒一次
+- K线/资金流向：页面加载时推送一次
+
 ## 股票代码格式
 
 程序自动识别市场，支持多种输入格式：
@@ -356,10 +402,11 @@ astock monitor start --interval 60
 
 | 数据类型 | 数据源 | 说明 |
 |----------|--------|------|
-| 实时行情 | 腾讯财经 `qt.gtimg.cn` | GBK编码，免费无需认证 |
+| 实时行情 | 腾讯财经 `qt.gtimg.cn` | GBK编码，免费无需认证，约15分钟延迟 |
 | K线数据 | 腾讯财经 `ifzq.gtimg.cn` | UTF-8 JSON，支持前复权 |
 | 财务数据 | 东方财富 `datacenter.eastmoney.com` | UTF-8 JSON，需Referer头 |
 | 股票搜索 | 东方财富 `searchapi.eastmoney.com` | 支持拼音/代码/名称 |
+| 实时数据 | 同花顺 (Chrome插件) | 无延迟，通过XHR拦截获取 |
 
 ## 项目结构
 
@@ -372,6 +419,9 @@ src/
     stock.rs           -- StockCode (代码+市场前缀映射)
     bar.rs             -- Bar (OHLCV K线), BarSeries
     quote.rs           -- Quote (实时行情快照)
+    tick_trade.rs      -- TickTrade (分时成交)
+    order_book.rs      -- OrderBookSnapshot (盘口5档)
+    money_flow.rs      -- MoneyFlow (资金流向)
   data/
     mod.rs             -- DataClient (统一API客户端)
     encoding.rs        -- GBK→UTF-8解码
@@ -405,12 +455,33 @@ src/
     position_repo.rs   -- 持仓管理
     watch_repo.rs      -- 自选股CRUD
     alert_repo.rs      -- 预警规则CRUD+历史
+    tick_repo.rs       -- 分时成交CRUD
+    orderbook_repo.rs  -- 盘口快照CRUD
+    moneyflow_repo.rs  -- 资金流向CRUD
+    quote_snapshot_repo.rs -- 行情快照CRUD
+  receiver/
+    mod.rs             -- axum路由+CORS+服务启动
+    handler.rs         -- 5个POST+2个GET端点处理
+    models.rs          -- 请求/响应JSON结构体
   monitor/
     mod.rs             -- 模块入口
     watcher.rs         -- 监控循环 (tokio interval)
     notifier.rs        -- macOS桌面通知
   display/
     table.rs           -- 表格展示 (红涨绿跌)
+
+astock-crx/                -- Chrome插件
+  manifest.json            -- Manifest V3配置
+  background.js            -- Service Worker数据流编排
+  content_scripts/
+    inject.js              -- 注入桥接+页面代码识别
+    interceptor.js         -- XHR/fetch拦截 (MAIN world)
+  popup/                   -- 插件弹窗UI
+  options/                 -- 设置页
+  lib/
+    stock-code.js          -- 股票代码映射
+    data-normalizer.js     -- API数据归一化
+    api-client.js          -- HTTP推送客户端
 ```
 
 ## 技术栈
@@ -427,6 +498,7 @@ src/
 | 错误 | anyhow + thiserror | 错误处理 |
 | 技术分析 | ta | MA/MACD/RSI/BOLL指标计算 |
 | 数据库 | rusqlite (bundled) | SQLite本地存储 |
+| HTTP服务 | axum + tower-http | 数据接收端 (Chrome插件桥接) |
 | 通知 | notify-rust | macOS桌面通知 |
 | 进程 | ctrlc | Ctrl+C优雅退出 |
 
@@ -439,3 +511,5 @@ src/
 5. **数据延迟**：免费API数据可能有15分钟延迟，不适用于实时交易决策
 6. **数据库位置**：`~/.astock/astock.db`，首次运行自动创建
 7. **A股成本模型**：佣金万三(最低5元)、印花税0.05%(仅卖出)、过户费0.001%
+8. **同花顺数据**：Chrome插件通过XHR拦截获取，无延迟；接收端自动触发预警检查
+9. **数据接收端**：仅监听127.0.0.1，使用WAL模式减少SQLite写锁冲突
