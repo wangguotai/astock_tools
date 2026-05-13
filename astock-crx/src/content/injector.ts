@@ -11,6 +11,7 @@ script.onload = () => script.remove();
 
 // 从页面接收拦截到的数据，转发给background
 window.addEventListener('message', (event) => {
+  debugger;
   if (event.source !== window) return;
   if (event.data.type !== 'ASTOCK_XHR_DATA' && event.data.type !== 'ASTOCK_FETCH_DATA') return;
 

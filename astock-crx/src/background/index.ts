@@ -30,7 +30,6 @@ function logPush(entry: PushLogEntry) {
 // 监听content script消息
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const msg = message as CapturedDataMessage | PageStockCodeMessage | PopupMessage;
-
   if (msg.type === 'CAPTURED_DATA') {
     handleCapturedData(msg.url, msg.body, msg.status);
   } else if (msg.type === 'PAGE_STOCK_CODE') {
