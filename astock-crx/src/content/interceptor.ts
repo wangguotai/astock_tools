@@ -1,8 +1,10 @@
 /**
- * 内容脚本 - XHR/Fetch拦截器 (运行在MAIN world)
- * 在页面上下文中hook网络请求，捕获同花顺数据API响应
- *
- * 注意: MAIN world 脚本无法 import 扩展模块，所有逻辑必须内联
+ * 内容脚本 - 数据拦截器 (运行在MAIN world)
+ * 同花顺通过 JSONP (<script> 标签) 加载数据，不走 XHR/fetch
+ * 拦截策略:
+ *   1. MutationObserver 监听 <script> 插入，捕获请求 URL
+ *   2. 覆写 JSONP 回调函数，捕获响应数据
+ *   3. 同时 hook fetch 作为补充（部分请求可能走 fetch）
  */
 
 const TARGET_DOMAINS = ['d.10jqka.com.cn', 'push2his.eastmoney.com', 'push2.eastmoney.com', 'qt.gtimg.cn'];
@@ -12,46 +14,131 @@ function isTargetUrl(url: string): boolean {
   return TARGET_DOMAINS.some((d) => url.includes(d));
 }
 
-// Hook XMLHttpRequest
-const OriginalXHR = window.XMLHttpRequest;
+// ===================== JSONP 拦截 =====================
 
-class HookedXHR extends OriginalXHR {
-  _hookUrl = '';
-  _hookMethod = '';
-
-  open(method: string, url: string | URL, ...args: any[]) {
-    this._hookUrl = url.toString();
-    this._hookMethod = method;
-    // @ts-ignore - XHR.open overloads
-    return super.open(method, url, ...args);
-  }
-
-  send(...args: any[]) {
-    this.addEventListener('load', function (this: HookedXHR) {
-      if (isTargetUrl(this._hookUrl)) {
-        debugger;
-        window.postMessage(
-          {
-            type: 'ASTOCK_XHR_DATA',
-            url: this._hookUrl,
-            response: this.responseText,
-            status: this.status,
-          },
-          '*',
-        );
-      }
-    });
-    return super.send(...args);
-  }
+// 从 URL 中提取 JSONP 回调函数名
+function extractCallbackName(url: string): string | null {
+  // 常见模式: callback=xxx, cb=xxx, jsonp=xxx
+  const match = url.match(/[?&](callback|cb|jsonp)=([^&]+)/);
+  if (match) return match[2]!;
+  return null;
 }
 
-(window as any).XMLHttpRequest = HookedXHR;
+// Hook: 监听 <script> 标签插入，拦截 JSONP 请求
+const observer = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    for (const node of mutation.addedNodes) {
+      if (node instanceof HTMLScriptElement && node.src && isTargetUrl(node.src)) {
+        const url = node.src;
+        const callbackName = extractCallbackName(url);
 
-// Hook fetch
-const originalFetch = window.fetch;
+        if (callbackName) {
+          // 有明确回调名：覆写全局回调
+          hookJsonpCallback(callbackName, url);
+        } else {
+          // 无明确回调名（如 last.js）：通过覆写 document 写入拦截
+          // 对于 .js 结尾的 JSONP，回调名通常在文件名或全局约定中
+          // 采样：尝试在 script onload 时读取全局变量
+          node.addEventListener('load', () => {
+            // 检查常见的全局数据对象
+            emitCapturedData(url);
+          });
+        }
+      }
+    }
+  }
+});
+
+// Hook JSONP 回调函数
+function hookJsonpCallback(callbackName: string, url: string) {
+  // 保存原始回调（如果存在）
+  const originalCallback = (window as any)[callbackName];
+
+  (window as any)[callbackName] = function (data: any) {
+    // 捕获数据
+    window.postMessage(
+      {
+        type: 'ASTOCK_JSONP_DATA',
+        url,
+        response: JSON.stringify(data),
+        status: 200,
+      },
+      '*',
+    );
+
+    // 调用原始回调
+    if (typeof originalCallback === 'function') {
+      originalCallback.call(window, data);
+    }
+  };
+}
+
+// script.onload 后尝试读取全局数据对象
+function emitCapturedData(url: string) {
+  // 同花顺有些 JSONP 将数据挂在特定全局变量上
+  // 尝试从 window 上找最近新增的属性
+  // 这是一种 best-effort 方式
+  window.postMessage(
+    {
+      type: 'ASTOCK_SCRIPT_LOAD',
+      url,
+      status: 200,
+    },
+    '*',
+  );
+}
+
+// 启动 MutationObserver
+observer.observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+});
+
+// ===================== 动态 <script> 拦截 =====================
+// 同花顺可能通过 document.createElement('script') 动态创建
+// 需要拦截 createElement 来捕获
+
+const originalCreateElement = document.createElement.bind(document);
+document.createElement = function (tagName: string, options?: ElementCreationOptions): HTMLElement {
+  const element = originalCreateElement(tagName, options);
+
+  if (tagName.toLowerCase() === 'script') {
+    const script = element as HTMLScriptElement;
+    const originalSrcSetter = Object.getOwnPropertyDescriptor(
+      HTMLScriptElement.prototype, 'src',
+    )?.set;
+
+    if (originalSrcSetter) {
+      Object.defineProperty(script, 'src', {
+        set(value: string) {
+          if (isTargetUrl(value)) {
+            const callbackName = extractCallbackName(value);
+            if (callbackName) {
+              hookJsonpCallback(callbackName, value);
+            }
+            // 记录 URL，等 load 事件时捕获
+            script.addEventListener('load', () => emitCapturedData(value));
+          }
+          originalSrcSetter.call(this, value);
+        },
+        get() {
+          return Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src')?.get?.call(this) || '';
+        },
+        configurable: true,
+      });
+    }
+  }
+
+  return element;
+} as any;
+
+// ===================== fetch 拦截 (补充) =====================
+// 保存原始 fetch，用闭包保护不被覆盖
+
+const _originalFetch = window.fetch.bind(window);
 
 window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
-  const response = await originalFetch.call(this, input, init);
+  const response = await _originalFetch(input, init);
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   if (isTargetUrl(url)) {
     try {
@@ -71,8 +158,7 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
       // ignore clone errors
     }
   }
-
   return response;
 };
 
-console.log('[astock] 拦截器已安装');
+console.log('[astock] 拦截器已安装 (JSONP + fetch)');
