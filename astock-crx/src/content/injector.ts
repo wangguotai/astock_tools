@@ -8,7 +8,6 @@ import { STOCK_PAGE_REGEX } from '@shared/constants';
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (event.data.type !== 'ASTOCK_XHR_DATA' && event.data.type !== 'ASTOCK_FETCH_DATA' && event.data.type !== 'ASTOCK_JSONP_DATA' && event.data.type !== 'ASTOCK_SCRIPT_LOAD') return;
-  debugger;
   chrome.runtime.sendMessage({
     type: 'CAPTURED_DATA',
     url: event.data.url,
@@ -34,7 +33,6 @@ debugger;
 // 监听URL变化（SPA导航）
 let lastUrl = window.location.href;
 const urlObserver = new MutationObserver(() => {
-  debugger;
   if (window.location.href !== lastUrl) {
     lastUrl = window.location.href;
     notifyStockCode();
@@ -44,3 +42,4 @@ urlObserver.observe(document.body || document.documentElement, {
   childList: true,
   subtree: true,
 });
+console.log()

@@ -22,8 +22,7 @@
     {
       "matches": ["https://stockpage.10jqka.com.cn/*"],
       "js": ["src/content/injector.ts"],
-      "run_at": "document_start",
-      "world": "MAIN"
+      "run_at": "document_start"
     },
     {
       "matches": ["https://stockpage.10jqka.com.cn/*"],
