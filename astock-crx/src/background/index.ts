@@ -57,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 /** 处理拦截到的数据 */
 function handleCapturedData(url: string, body: string, status: number) {
+  debugger;
   if (status !== 200 || !body) return;
 
   const result = normalizeData(url, body);
