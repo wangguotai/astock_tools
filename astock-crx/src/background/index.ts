@@ -11,10 +11,7 @@ import type { CapturedDataMessage, PageStockCodeMessage, PopupMessage, PushLogEn
 // 推送节流状态
 const pushState = {
   lastQuotePush: {} as Record<string, number>,
-  lastOrderbookPush: {} as Record<string, number>,
   lastOrderbookSnapshot: {} as Record<string, string>,
-  pendingTicks: {} as Record<string, any[]>,
-  tickTimer: {} as Record<string, ReturnType<typeof setTimeout> | null>,
   sentTickIds: {} as Record<string, Set<string>>,
   pushedKline: new Set<string>(),
   pushedMoneyflow: new Set<string>(),
@@ -48,9 +45,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     pushState.pushedKline.delete(msg.code);
     pushState.pushedMoneyflow.delete(msg.code);
     pushState.lastQuotePush[msg.code] = 0;
-    pushState.lastOrderbookPush[msg.code] = 0;
     pushState.lastOrderbookSnapshot[msg.code] = '';
-    pushState.pendingTicks[msg.code] = [];
     pushState.sentTickIds[msg.code] = new Set();
   } else if (msg.type === 'GET_PUSH_LOG') {
     sendResponse(memoryLog);
@@ -62,7 +57,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   } else if (msg.type === 'FORCE_PUSH') {
     pushState.lastQuotePush = {};
-    pushState.lastOrderbookPush = {};
+    pushState.lastOrderbookSnapshot = {};
+    pushState.sentTickIds = {};
     pushState.pushedKline.clear();
     pushState.pushedMoneyflow.clear();
     sendResponse({ status: 'ok' });
@@ -99,8 +95,6 @@ function handleCapturedData(url: string, body: string, status: number) {
     }
 
     case 'tick': {
-      debugger;
-      if (!pushState.pendingTicks[code]) pushState.pendingTicks[code] = [];
       if (!pushState.sentTickIds[code]) pushState.sentTickIds[code] = new Set();
 
       // 过滤已发送的 tick（按 id 去重）
@@ -111,7 +105,7 @@ function handleCapturedData(url: string, body: string, status: number) {
         return true;
       });
 
-      pushState.pendingTicks[code].push(...newTicks);
+      if (newTicks.length === 0) break;
 
       // 限制 sentTickIds 集合大小（保留最近 500 条）
       const ids = Array.from(pushState.sentTickIds[code]);
@@ -119,20 +113,12 @@ function handleCapturedData(url: string, body: string, status: number) {
         pushState.sentTickIds[code] = new Set(ids.slice(-500));
       }
 
-      if (!pushState.tickTimer[code]) {
-        pushState.tickTimer[code] = setTimeout(() => {
-          const pending = pushState.pendingTicks[code] || [];
-          if (pending.length > 0) {
-            pushTicks({ ticks: pending }).then((r) => {
-              logPush({ time: beijingNow(), type: 'tick', code, count: pending.length, success: r.status === 'ok' });
-            }).catch(() => {
-              logPush({ time: beijingNow(), type: 'tick', code, count: pending.length, success: false });
-            });
-          }
-          pushState.pendingTicks[code] = [];
-          pushState.tickTimer[code] = null;
-        }, THROTTLE.tickBatch);
-      }
+      // 实时发送：不使用批量延迟，直接推送
+      pushTicks({ ticks: newTicks }).then((r) => {
+        logPush({ time: beijingNow(), type: 'tick', code, count: newTicks.length, success: r.status === 'ok' });
+      }).catch(() => {
+        logPush({ time: beijingNow(), type: 'tick', code, count: newTicks.length, success: false });
+      });
       break;
     }
 
@@ -149,26 +135,23 @@ function handleCapturedData(url: string, body: string, status: number) {
     }
 
     case 'orderbook': {
-      const lastPush = pushState.lastOrderbookPush[code] || 0;
-      if (now - lastPush >= THROTTLE.orderbook) {
-        // 变化检测：只有五档数据变化时才推送
-        const snapshot = [
-          ...result.data.bid_prices,
-          ...result.data.bid_volumes.map(String),
-          ...result.data.ask_prices,
-          ...result.data.ask_volumes.map(String),
-        ].join(',');
-        if (snapshot === pushState.lastOrderbookSnapshot[code]) {
-          break; // 数据未变，跳过推送
-        }
-        pushState.lastOrderbookSnapshot[code] = snapshot;
-        pushState.lastOrderbookPush[code] = now;
-        pushOrderBook(result.data).then((r) => {
-          logPush({ time: beijingNow(), type: 'orderbook', code, success: r.status === 'ok' });
-        }).catch(() => {
-          logPush({ time: beijingNow(), type: 'orderbook', code, success: false });
-        });
+      // 变化检测：只有五档数据变化时才推送
+      const snapshot = [
+        ...result.data.bid_prices,
+        ...result.data.bid_volumes.map(String),
+        ...result.data.ask_prices,
+        ...result.data.ask_volumes.map(String),
+      ].join(',');
+      if (snapshot === pushState.lastOrderbookSnapshot[code]) {
+        break; // 数据未变，跳过推送
       }
+      pushState.lastOrderbookSnapshot[code] = snapshot;
+      // 实时发送：不使用节流
+      pushOrderBook(result.data).then((r) => {
+        logPush({ time: beijingNow(), type: 'orderbook', code, success: r.status === 'ok' });
+      }).catch(() => {
+        logPush({ time: beijingNow(), type: 'orderbook', code, success: false });
+      });
       break;
     }
 

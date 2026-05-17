@@ -25,8 +25,6 @@ export const API_CODE_REGEX = /hs_(\d{6})/;
 /** 节流配置 (毫秒) */
 export const THROTTLE = {
   quote: 10_000,
-  orderbook: 5_000,
-  tickBatch: 5_000,
 } as const;
 
 /** 默认astock接收端地址 */
