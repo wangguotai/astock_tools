@@ -28,6 +28,13 @@ fn dirs_home() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("/tmp"))
 }
 
+/// 获取北京时间字符串 (格式: YYYY-MM-DD HH:MM:SS)
+pub fn beijing_now() -> String {
+    chrono::Local::now()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
 /// 打开数据库连接并初始化表结构
 pub fn open_db() -> anyhow::Result<Connection> {
     let path = db_path();

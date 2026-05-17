@@ -23,6 +23,15 @@ const pushState = {
 // 内存推送日志 (最近20条，快速查询)
 const memoryLog: PushLogEntry[] = [];
 
+/** 北京时间字符串 (格式: YYYY-MM-DD HH:mm:ss) */
+function beijingNow(): string {
+  const now = new Date();
+  const offset = 8 * 60; // 北京时间 UTC+8
+  const localTime = new Date(now.getTime() + offset * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${localTime.getUTCFullYear()}-${pad(localTime.getUTCMonth() + 1)}-${pad(localTime.getUTCDate())} ${pad(localTime.getUTCHours())}:${pad(localTime.getUTCMinutes())}:${pad(localTime.getUTCSeconds())}`;
+}
+
 function logPush(entry: PushLogEntry) {
   memoryLog.unshift(entry);
   if (memoryLog.length > 20) memoryLog.pop();
@@ -80,10 +89,10 @@ function handleCapturedData(url: string, body: string, status: number) {
       if (now - lastPush >= THROTTLE.quote) {
         pushState.lastQuotePush[code] = now;
         pushQuote(result.data).then((r) => {
-          logPush({ time: new Date().toISOString(), type: 'quote', code, success: r.status === 'ok' });
+          logPush({ time: beijingNow(), type: 'quote', code, success: r.status === 'ok' });
           updateBadge(code, result.data.price);
         }).catch(() => {
-          logPush({ time: new Date().toISOString(), type: 'quote', code, success: false });
+          logPush({ time: beijingNow(), type: 'quote', code, success: false });
         });
       }
       break;
@@ -115,9 +124,9 @@ function handleCapturedData(url: string, body: string, status: number) {
           const pending = pushState.pendingTicks[code] || [];
           if (pending.length > 0) {
             pushTicks({ ticks: pending }).then((r) => {
-              logPush({ time: new Date().toISOString(), type: 'tick', code, count: pending.length, success: r.status === 'ok' });
+              logPush({ time: beijingNow(), type: 'tick', code, count: pending.length, success: r.status === 'ok' });
             }).catch(() => {
-              logPush({ time: new Date().toISOString(), type: 'tick', code, count: pending.length, success: false });
+              logPush({ time: beijingNow(), type: 'tick', code, count: pending.length, success: false });
             });
           }
           pushState.pendingTicks[code] = [];
@@ -131,9 +140,9 @@ function handleCapturedData(url: string, body: string, status: number) {
       if (!pushState.pushedKline.has(code)) {
         pushState.pushedKline.add(code);
         pushKline(result.data).then((r) => {
-          logPush({ time: new Date().toISOString(), type: 'kline', code, count: result.data.bars.length, success: r.status === 'ok' });
+          logPush({ time: beijingNow(), type: 'kline', code, count: result.data.bars.length, success: r.status === 'ok' });
         }).catch(() => {
-          logPush({ time: new Date().toISOString(), type: 'kline', code, count: result.data.bars.length, success: false });
+          logPush({ time: beijingNow(), type: 'kline', code, count: result.data.bars.length, success: false });
         });
       }
       break;
@@ -155,9 +164,9 @@ function handleCapturedData(url: string, body: string, status: number) {
         pushState.lastOrderbookSnapshot[code] = snapshot;
         pushState.lastOrderbookPush[code] = now;
         pushOrderBook(result.data).then((r) => {
-          logPush({ time: new Date().toISOString(), type: 'orderbook', code, success: r.status === 'ok' });
+          logPush({ time: beijingNow(), type: 'orderbook', code, success: r.status === 'ok' });
         }).catch(() => {
-          logPush({ time: new Date().toISOString(), type: 'orderbook', code, success: false });
+          logPush({ time: beijingNow(), type: 'orderbook', code, success: false });
         });
       }
       break;
@@ -167,9 +176,9 @@ function handleCapturedData(url: string, body: string, status: number) {
       if (!pushState.pushedMoneyflow.has(code)) {
         pushState.pushedMoneyflow.add(code);
         pushMoneyFlow(result.data).then((r) => {
-          logPush({ time: new Date().toISOString(), type: 'moneyflow', code, success: r.status === 'ok' });
+          logPush({ time: beijingNow(), type: 'moneyflow', code, success: r.status === 'ok' });
         }).catch(() => {
-          logPush({ time: new Date().toISOString(), type: 'moneyflow', code, success: false });
+          logPush({ time: beijingNow(), type: 'moneyflow', code, success: false });
         });
       }
       break;
