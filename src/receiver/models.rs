@@ -53,6 +53,7 @@ pub struct KlineBatchData {
 /// 分时成交条目
 #[derive(Debug, Deserialize)]
 pub struct TickEntry {
+    pub id: Option<String>,
     pub code: String,
     pub trade_time: String,
     pub price: String,

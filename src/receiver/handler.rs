@@ -119,6 +119,7 @@ pub async fn push_tick(
             Err(_) => continue,
         };
         ticks.push(crate::models::tick_trade::TickTrade {
+            tick_id: entry.id.clone(),
             code,
             trade_time: entry.trade_time.clone(),
             price: Decimal::from_str(&entry.price).unwrap_or(Decimal::ZERO),

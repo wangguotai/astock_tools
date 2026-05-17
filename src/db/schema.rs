@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 
 CREATE TABLE IF NOT EXISTS tick_trades (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    tick_id    TEXT UNIQUE,
     code       TEXT NOT NULL,
     trade_time TEXT NOT NULL,
     price      TEXT NOT NULL,
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS tick_trades (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_tick_code_time ON tick_trades(code, trade_time);
+CREATE INDEX IF NOT EXISTS idx_tick_tick_id ON tick_trades(tick_id);
 
 CREATE TABLE IF NOT EXISTS order_book_snapshots (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
