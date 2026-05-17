@@ -36,6 +36,68 @@ function extractJsonFromJsonp(body: string): any | null {
   return null;
 }
 
+/** 解析五档数据 (fiverange JSONP) */
+function parseFiverangeData(url: string, body: string, code: string): NormalizedData | null {
+  try {
+    const json = extractJsonFromJsonp(body);
+    if (!json) return null;
+    const astockCode = toAstockCode(code);
+    if (!astockCode) return null;
+
+    const items = json.items || json;
+    // 同花顺字段映射 (fiverange):
+    // 24=买一价, 25=买一量, 26=买二价, 27=买二量, 28=买三价, 29=买三量
+    // 150=买四价, 151=买四量, 154=买五价, 155=买五量
+    // 30=卖一价, 31=卖一量, 32=卖二价, 33=卖二量, 34=卖三价, 35=卖三量
+    // 152=卖四价, 153=卖四量, 156=卖五价, 157=卖五量
+    const bidPrices = [
+      String(items['24'] ?? '0'),
+      String(items['26'] ?? '0'),
+      String(items['28'] ?? '0'),
+      String(items['150'] ?? '0'),
+      String(items['154'] ?? '0'),
+    ];
+    const bidVolumes = [
+      parseFloat(String(items['25'] ?? '0')) || 0,
+      parseFloat(String(items['27'] ?? '0')) || 0,
+      parseFloat(String(items['29'] ?? '0')) || 0,
+      parseFloat(String(items['151'] ?? '0')) || 0,
+      parseFloat(String(items['155'] ?? '0')) || 0,
+    ];
+    const askPrices = [
+      String(items['30'] ?? '0'),
+      String(items['32'] ?? '0'),
+      String(items['34'] ?? '0'),
+      String(items['152'] ?? '0'),
+      String(items['156'] ?? '0'),
+    ];
+    const askVolumes = [
+      parseFloat(String(items['31'] ?? '0')) || 0,
+      parseFloat(String(items['33'] ?? '0')) || 0,
+      parseFloat(String(items['35'] ?? '0')) || 0,
+      parseFloat(String(items['153'] ?? '0')) || 0,
+      parseFloat(String(items['157'] ?? '0')) || 0,
+    ];
+
+    // 全部为0说明解析失败
+    const allZero = [...bidPrices, ...askPrices].every(p => p === '0');
+    if (allZero) return null;
+
+    const obData: OrderBookData = {
+      code: astockCode,
+      snap_time: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      bid_prices: bidPrices,
+      bid_volumes: bidVolumes,
+      ask_prices: askPrices,
+      ask_volumes: askVolumes,
+    };
+
+    return { type: 'orderbook', data: obData };
+  } catch {
+    return null;
+  }
+}
+
 /** 解析分时成交明细 (exchangedetail JSONP) */
 function parseExchangeDetailData(url: string, body: string, code: string): NormalizedData | null {
   try {
@@ -44,28 +106,23 @@ function parseExchangeDetailData(url: string, body: string, code: string): Norma
     const astockCode = toAstockCode(code);
     if (!astockCode) return null;
 
-    const items = json.items || [];
+    const rawItems = json.items;
+    if (!rawItems || !Array.isArray(rawItems) || rawItems.length === 0) return null;
+
     const ticks: TickEntry[] = [];
 
-    for (const item of items) {
-      // 字段映射 (来自同花顺 exchangedetail API):
-      // 10 = 价格, 49 = 成交量, 12 = 买卖方向, 625295 = 成交额(元), His = 时间
+    for (const item of rawItems) {
       const price = String(item['10'] ?? '0');
       const volume = parseFloat(String(item['49'] ?? '0')) || 0;
       const hisTime = String(item['His'] ?? '');
-      // 12: 1=主动卖, 5=主动买 (可能是红绿标记)
       const dirValue = parseInt(String(item['12'] ?? '0'));
       const direction: TradeDirection = dirValue === 5 ? 'buy' : dirValue === 1 ? 'sell' : 'neutral';
 
       if (price === '0' || !hisTime) continue;
 
-      // His 格式: "14:56:30"
-      const timeParts = hisTime.split(':');
-      const trade_time = timeParts.length === 3 ? hisTime : '';
-
       ticks.push({
         code: astockCode,
-        trade_time,
+        trade_time: hisTime,
         price,
         volume,
         direction,
@@ -271,6 +328,9 @@ export function normalizeData(url: string, body: string): NormalizedData | null 
   const code = extractCodeFromApiUrl(url);
   if (!code) return null;
 
+  if (url.includes('/fiverange/')) {
+    return parseFiverangeData(url, body, code);
+  }
   if (url.includes('/exchangedetail/')) {
     return parseExchangeDetailData(url, body, code);
   }

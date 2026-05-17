@@ -74,10 +74,36 @@ function hookJsonpCallback(callbackName: string, url: string) {
 }
 
 // script.onload 后尝试读取全局数据对象
-function emitCapturedData(url: string) {
-  // 同花顺有些 JSONP 将数据挂在特定全局变量上
-  // 尝试从 window 上找最近新增的属性
-  // 这是一种 best-effort 方式
+async function emitCapturedData(url: string) {
+  // 对于 .js JSONP 端点，直接用 fetch 获取响应体
+  if (url.includes('.js')) {
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) {
+        const body = await resp.text();
+        window.postMessage(
+          {
+            type: 'ASTOCK_JSONP_DATA',
+            url,
+            response: body,
+            status: 200,
+          },
+          '*',
+        );
+      }
+    } catch {
+      // fallback: 只发 URL
+      window.postMessage(
+        {
+          type: 'ASTOCK_SCRIPT_LOAD',
+          url,
+          status: 200,
+        },
+        '*',
+      );
+    }
+    return;
+  }
   window.postMessage(
     {
       type: 'ASTOCK_SCRIPT_LOAD',
