@@ -112,6 +112,7 @@ function parseExchangeDetailData(url: string, body: string, code: string): Norma
     const ticks: TickEntry[] = [];
 
     for (const item of rawItems) {
+      const tickId = String(item['1'] ?? '');
       const price = String(item['10'] ?? '0');
       const volume = parseFloat(String(item['49'] ?? '0')) || 0;
       const hisTime = String(item['His'] ?? '');
@@ -121,6 +122,7 @@ function parseExchangeDetailData(url: string, body: string, code: string): Norma
       if (price === '0' || !hisTime) continue;
 
       ticks.push({
+        id: tickId || undefined,
         code: astockCode,
         trade_time: hisTime,
         price,

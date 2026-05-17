@@ -48,6 +48,7 @@ export interface KlineBatchData {
 
 /** 分时成交条目 */
 export interface TickEntry {
+  id?: string; // 成交单号 (exchangedetail 的 1 字段)
   code: AstockCode;
   trade_time: string;
   price: string;

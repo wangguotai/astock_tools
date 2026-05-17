@@ -12,8 +12,10 @@ import type { CapturedDataMessage, PageStockCodeMessage, PopupMessage, PushLogEn
 const pushState = {
   lastQuotePush: {} as Record<string, number>,
   lastOrderbookPush: {} as Record<string, number>,
+  lastOrderbookSnapshot: {} as Record<string, string>,
   pendingTicks: {} as Record<string, any[]>,
   tickTimer: {} as Record<string, ReturnType<typeof setTimeout> | null>,
+  sentTickIds: {} as Record<string, Set<string>>,
   pushedKline: new Set<string>(),
   pushedMoneyflow: new Set<string>(),
 };
@@ -36,6 +38,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     setCurrentCode(msg.code);
     pushState.pushedKline.delete(msg.code);
     pushState.pushedMoneyflow.delete(msg.code);
+    pushState.lastQuotePush[msg.code] = 0;
+    pushState.lastOrderbookPush[msg.code] = 0;
+    pushState.lastOrderbookSnapshot[msg.code] = '';
+    pushState.pendingTicks[msg.code] = [];
+    pushState.sentTickIds[msg.code] = new Set();
   } else if (msg.type === 'GET_PUSH_LOG') {
     sendResponse(memoryLog);
   } else if (msg.type === 'GET_STATUS') {
@@ -57,7 +64,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 /** 处理拦截到的数据 */
 function handleCapturedData(url: string, body: string, status: number) {
-  debugger;
   if (status !== 200 || !body) return;
 
   const result = normalizeData(url, body);
@@ -84,8 +90,25 @@ function handleCapturedData(url: string, body: string, status: number) {
     }
 
     case 'tick': {
+      debugger;
       if (!pushState.pendingTicks[code]) pushState.pendingTicks[code] = [];
-      pushState.pendingTicks[code].push(...result.data.ticks);
+      if (!pushState.sentTickIds[code]) pushState.sentTickIds[code] = new Set();
+
+      // 过滤已发送的 tick（按 id 去重）
+      const newTicks = result.data.ticks.filter((t: any) => {
+        if (!t.id) return true; // 无 id 的原始 tick 不过滤
+        if (pushState.sentTickIds[code].has(t.id)) return false;
+        pushState.sentTickIds[code].add(t.id);
+        return true;
+      });
+
+      pushState.pendingTicks[code].push(...newTicks);
+
+      // 限制 sentTickIds 集合大小（保留最近 500 条）
+      const ids = Array.from(pushState.sentTickIds[code]);
+      if (ids.length > 500) {
+        pushState.sentTickIds[code] = new Set(ids.slice(-500));
+      }
 
       if (!pushState.tickTimer[code]) {
         pushState.tickTimer[code] = setTimeout(() => {
@@ -119,6 +142,17 @@ function handleCapturedData(url: string, body: string, status: number) {
     case 'orderbook': {
       const lastPush = pushState.lastOrderbookPush[code] || 0;
       if (now - lastPush >= THROTTLE.orderbook) {
+        // 变化检测：只有五档数据变化时才推送
+        const snapshot = [
+          ...result.data.bid_prices,
+          ...result.data.bid_volumes.map(String),
+          ...result.data.ask_prices,
+          ...result.data.ask_volumes.map(String),
+        ].join(',');
+        if (snapshot === pushState.lastOrderbookSnapshot[code]) {
+          break; // 数据未变，跳过推送
+        }
+        pushState.lastOrderbookSnapshot[code] = snapshot;
         pushState.lastOrderbookPush[code] = now;
         pushOrderBook(result.data).then((r) => {
           logPush({ time: new Date().toISOString(), type: 'orderbook', code, success: r.status === 'ok' });

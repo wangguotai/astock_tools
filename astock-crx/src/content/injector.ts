@@ -29,7 +29,6 @@ function notifyStockCode() {
 }
 
 notifyStockCode();
-debugger;
 // 监听URL变化（SPA导航）
 let lastUrl = window.location.href;
 const urlObserver = new MutationObserver(() => {
