@@ -9,6 +9,7 @@ import type {
   TickEntry,
   OrderBookData,
   MoneyFlowData,
+  TradeDirection,
 } from './types';
 
 /** 从JSONP响应中提取JSON */
@@ -33,6 +34,48 @@ function extractJsonFromJsonp(body: string): any | null {
   }
 
   return null;
+}
+
+/** 解析分时成交明细 (exchangedetail JSONP) */
+function parseExchangeDetailData(url: string, body: string, code: string): NormalizedData | null {
+  try {
+    const json = extractJsonFromJsonp(body);
+    if (!json) return null;
+    const astockCode = toAstockCode(code);
+    if (!astockCode) return null;
+
+    const items = json.items || [];
+    const ticks: TickEntry[] = [];
+
+    for (const item of items) {
+      // 字段映射 (来自同花顺 exchangedetail API):
+      // 10 = 价格, 49 = 成交量, 12 = 买卖方向, 625295 = 成交额(元), His = 时间
+      const price = String(item['10'] ?? '0');
+      const volume = parseFloat(String(item['49'] ?? '0')) || 0;
+      const hisTime = String(item['His'] ?? '');
+      // 12: 1=主动卖, 5=主动买 (可能是红绿标记)
+      const dirValue = parseInt(String(item['12'] ?? '0'));
+      const direction: TradeDirection = dirValue === 5 ? 'buy' : dirValue === 1 ? 'sell' : 'neutral';
+
+      if (price === '0' || !hisTime) continue;
+
+      // His 格式: "14:56:30"
+      const timeParts = hisTime.split(':');
+      const trade_time = timeParts.length === 3 ? hisTime : '';
+
+      ticks.push({
+        code: astockCode,
+        trade_time,
+        price,
+        volume,
+        direction,
+      });
+    }
+
+    return ticks.length > 0 ? { type: 'tick', data: { ticks } } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 解析分时数据 */
@@ -228,6 +271,9 @@ export function normalizeData(url: string, body: string): NormalizedData | null 
   const code = extractCodeFromApiUrl(url);
   if (!code) return null;
 
+  if (url.includes('/exchangedetail/')) {
+    return parseExchangeDetailData(url, body, code);
+  }
   if (url.includes('/line/') && url.includes('/01/')) {
     return parseTimeshareData(url, body, code);
   }
