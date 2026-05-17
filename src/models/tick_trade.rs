@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TickTrade {
+    /// 成交单号（唯一标识，用于数据库去重）
+    pub tick_id: Option<String>,
     pub code: StockCode,
     /// 成交时间 HH:MM:SS
     pub trade_time: String,
