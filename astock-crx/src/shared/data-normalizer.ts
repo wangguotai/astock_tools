@@ -400,21 +400,8 @@ export function normalizeData(url: string, body: string): NormalizedData | null 
   if (url.includes('/v6/time/')) {
     return parseTimeData(url, body, code);
   }
-  if (url.includes('/line/') && url.includes('/01/')) {
-    return parseTimeshareData(url, body, code);
-  }
-  if (url.includes('/line/') && (url.includes('/11/') || url.includes('/21/'))) {
-    return parseKlineData(url, body, code);
-  }
-  if (url.includes('/line/')) {
-    return parseKlineData(url, body, code);
-  }
   if (url.includes('/moneyflow/')) {
     return parseMoneyFlowData(url, body, code);
   }
-  if (url.includes('/trade/') || url.includes('/detail')) {
-    return parseOrderBookData(url, body, code);
-  }
-
   return parseQuoteData(url, body, code);
 }
