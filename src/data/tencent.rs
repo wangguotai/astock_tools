@@ -90,9 +90,16 @@ pub fn parse_tencent_quotes(raw: &str, _codes: &[StockCode]) -> Vec<Quote> {
                     turnover,
                     bid,
                     ask,
+                    bid_vol: None,
+                    ask_vol: None,
                     change,
                     change_pct,
-                    time: String::new(), // 腾讯API时间字段不直观，暂留空
+                    high_limit: None,
+                    low_limit: None,
+                    inner_vol: None,
+                    outer_vol: None,
+                    open_vol: None,
+                    time: String::new(),
                 });
             }
         }

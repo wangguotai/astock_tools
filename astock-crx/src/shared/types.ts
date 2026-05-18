@@ -15,18 +15,25 @@ export type TradeDirection = 'buy' | 'sell' | 'neutral';
 export interface QuoteData {
   code: AstockCode;
   name?: string;
-  price: string;
-  prev_close?: string;
-  open?: string;
-  high?: string;
-  low?: string;
-  volume?: number;
-  turnover?: string;
-  bid?: string;
-  ask?: string;
-  change?: string;
-  change_pct?: string;
-  time?: string;
+  price: string;          // 当前价
+  prev_close?: string;     // 昨收价
+  open?: string;           // 开盘价
+  high?: string;           // 最高价
+  low?: string;            // 最低价
+  volume?: number;         // 成交量
+  turnover?: string;       // 成交额
+  bid?: string;            // 买一价
+  ask?: string;            // 卖一价
+  bid_vol?: number;        // 买一量
+  ask_vol?: number;        // 卖一量
+  change?: string;         // 涨跌额
+  change_pct?: string;    // 涨跌幅
+  high_limit?: string;     // 涨停价
+  low_limit?: string;       // 跌停价
+  inner_vol?: number;      // 内盘（主动卖出量）
+  outer_vol?: number;      // 外盘（主动买入量）
+  open_vol?: number;       // 开盘成交量
+  time?: string;           // 更新时间
 }
 
 /** K线条目 */

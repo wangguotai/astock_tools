@@ -26,8 +26,15 @@ pub struct QuoteData {
     pub turnover: Option<String>,
     pub bid: Option<String>,
     pub ask: Option<String>,
+    pub bid_vol: Option<i64>,
+    pub ask_vol: Option<i64>,
     pub change: Option<String>,
     pub change_pct: Option<String>,
+    pub high_limit: Option<String>,
+    pub low_limit: Option<String>,
+    pub inner_vol: Option<i64>,
+    pub outer_vol: Option<i64>,
+    pub open_vol: Option<i64>,
     pub time: Option<String>,
 }
 

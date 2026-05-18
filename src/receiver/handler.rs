@@ -46,8 +46,15 @@ pub async fn push_quote(
         turnover: parse_dec(req.data.turnover.as_ref()),
         bid: parse_dec(req.data.bid.as_ref()),
         ask: parse_dec(req.data.ask.as_ref()),
+        bid_vol: req.data.bid_vol,
+        ask_vol: req.data.ask_vol,
         change: parse_dec(req.data.change.as_ref()),
         change_pct: parse_dec(req.data.change_pct.as_ref()),
+        high_limit: req.data.high_limit.as_ref().and_then(|v| Decimal::from_str(v).ok()),
+        low_limit: req.data.low_limit.as_ref().and_then(|v| Decimal::from_str(v).ok()),
+        inner_vol: req.data.inner_vol,
+        outer_vol: req.data.outer_vol,
+        open_vol: req.data.open_vol,
         time: req.data.time.unwrap_or_default(),
     };
 

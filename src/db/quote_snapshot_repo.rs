@@ -9,8 +9,8 @@ use std::str::FromStr;
 pub fn save_quote_snapshot(conn: &Connection, quote: &Quote, source: &str) -> anyhow::Result<()> {
     let code = quote.code.for_api();
     conn.execute(
-        "INSERT INTO quote_snapshots (code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, change_val, change_pct, quote_time, source)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+        "INSERT INTO quote_snapshots (code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time, source)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             code,
             quote.name,
@@ -23,8 +23,15 @@ pub fn save_quote_snapshot(conn: &Connection, quote: &Quote, source: &str) -> an
             quote.turnover.to_string(),
             quote.bid.to_string(),
             quote.ask.to_string(),
+            quote.bid_vol,
+            quote.ask_vol,
             quote.change.to_string(),
             quote.change_pct.to_string(),
+            quote.high_limit.map(|d| d.to_string()),
+            quote.low_limit.map(|d| d.to_string()),
+            quote.inner_vol,
+            quote.outer_vol,
+            quote.open_vol,
             quote.time,
             source,
         ],
@@ -39,48 +46,38 @@ pub fn get_latest_snapshot(
 ) -> anyhow::Result<Option<Quote>> {
     let code_str = code.for_api();
     let mut stmt = conn.prepare(
-        "SELECT code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, change_val, change_pct, quote_time
+        "SELECT code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time
          FROM quote_snapshots WHERE code = ?1 ORDER BY created_at DESC LIMIT 1"
     )?;
 
     let result = stmt.query_row(params![code_str], |row| {
-        let c: String = row.get(0)?;
-        let n: String = row.get(1)?;
-        let p: String = row.get(2)?;
-        let pc: String = row.get(3)?;
-        let o: String = row.get(4)?;
-        let h: String = row.get(5)?;
-        let l: String = row.get(6)?;
-        let v: i64 = row.get(7)?;
-        let t: String = row.get(8)?;
-        let b: String = row.get(9)?;
-        let a: String = row.get(10)?;
-        let ch: String = row.get(11)?;
-        let cp: String = row.get(12)?;
-        let qt: String = row.get(13)?;
-        Ok((c, n, p, pc, o, h, l, v, t, b, a, ch, cp, qt))
+        Ok(Quote {
+            code: StockCode::from_raw(&row.get::<_, String>(0)?).unwrap_or_else(|_| code.clone()),
+            name: row.get(1)?,
+            price: Decimal::from_str(&row.get::<_, String>(2)?).unwrap_or(Decimal::ZERO),
+            prev_close: Decimal::from_str(&row.get::<_, String>(3)?).unwrap_or(Decimal::ZERO),
+            open: Decimal::from_str(&row.get::<_, String>(4)?).unwrap_or(Decimal::ZERO),
+            high: Decimal::from_str(&row.get::<_, String>(5)?).unwrap_or(Decimal::ZERO),
+            low: Decimal::from_str(&row.get::<_, String>(6)?).unwrap_or(Decimal::ZERO),
+            volume: row.get(7)?,
+            turnover: Decimal::from_str(&row.get::<_, String>(8)?).unwrap_or(Decimal::ZERO),
+            bid: Decimal::from_str(&row.get::<_, String>(9)?).unwrap_or(Decimal::ZERO),
+            ask: Decimal::from_str(&row.get::<_, String>(10)?).unwrap_or(Decimal::ZERO),
+            bid_vol: row.get(11)?,
+            ask_vol: row.get(12)?,
+            change: Decimal::from_str(&row.get::<_, String>(13)?).unwrap_or(Decimal::ZERO),
+            change_pct: Decimal::from_str(&row.get::<_, String>(14)?).unwrap_or(Decimal::ZERO),
+            high_limit: row.get::<_, Option<String>>(15)?.and_then(|s| Decimal::from_str(&s).ok()),
+            low_limit: row.get::<_, Option<String>>(16)?.and_then(|s| Decimal::from_str(&s).ok()),
+            inner_vol: row.get(17)?,
+            outer_vol: row.get(18)?,
+            open_vol: row.get(19)?,
+            time: row.get(20)?,
+        })
     });
 
     match result {
-        Ok((c, n, p, pc, o, h, l, v, t, b, a, ch, cp, qt)) => {
-            let q_code = StockCode::from_raw(&c).unwrap_or_else(|_| code.clone());
-            Ok(Some(Quote {
-                code: q_code,
-                name: n,
-                price: Decimal::from_str(&p).unwrap_or(Decimal::ZERO),
-                prev_close: Decimal::from_str(&pc).unwrap_or(Decimal::ZERO),
-                open: Decimal::from_str(&o).unwrap_or(Decimal::ZERO),
-                high: Decimal::from_str(&h).unwrap_or(Decimal::ZERO),
-                low: Decimal::from_str(&l).unwrap_or(Decimal::ZERO),
-                volume: v,
-                turnover: Decimal::from_str(&t).unwrap_or(Decimal::ZERO),
-                bid: Decimal::from_str(&b).unwrap_or(Decimal::ZERO),
-                ask: Decimal::from_str(&a).unwrap_or(Decimal::ZERO),
-                change: Decimal::from_str(&ch).unwrap_or(Decimal::ZERO),
-                change_pct: Decimal::from_str(&cp).unwrap_or(Decimal::ZERO),
-                time: qt,
-            }))
-        }
+        Ok(q) => Ok(Some(q)),
         Err(_) => Ok(None),
     }
 }
