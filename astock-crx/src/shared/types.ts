@@ -55,6 +55,21 @@ export interface KlineBatchData {
   bars: KlineEntry[];
 }
 
+/** 分时历史数据批量 */
+export interface TimeshareBatchData {
+  points: TimesharePoint[];
+}
+
+/** 分时历史数据条目 */
+export interface TimesharePoint {
+  code: AstockCode;
+  trade_time: string;
+  price: string;
+  volume: number;
+  avg_price?: string;
+  cum_volume?: number;
+}
+
 /** 分时成交条目 */
 export interface TickEntry {
   id?: string; // 成交单号 (exchangedetail 的 1 字段)
@@ -62,6 +77,8 @@ export interface TickEntry {
   trade_time: string;
   price: string;
   volume: number;
+  avg_price?: string;      // 成交均价 (v6/time parts[3])
+  cum_volume?: number;      // 累计成交量 (v6/time parts[2])
   direction?: TradeDirection;
 }
 
@@ -132,6 +149,7 @@ export type NormalizedData =
   | { type: 'quote'; data: QuoteData }
   | { type: 'kline'; data: KlineBatchData }
   | { type: 'tick'; data: TickBatchData }
+  | { type: 'timeshare'; data: TimeshareBatchData }
   | { type: 'orderbook'; data: OrderBookData }
   | { type: 'moneyflow'; data: MoneyFlowData };
 

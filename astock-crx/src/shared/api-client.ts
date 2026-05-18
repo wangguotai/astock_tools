@@ -6,6 +6,7 @@ import type {
   QuoteData,
   KlineBatchData,
   TickBatchData,
+  TimeshareBatchData,
   OrderBookData,
   MoneyFlowData,
   ApiResponse,
@@ -50,6 +51,17 @@ export async function pushKline(data: KlineBatchData): Promise<ApiResponse> {
 export async function pushTicks(data: TickBatchData): Promise<ApiResponse> {
   const client = await getClient();
   const res = await client.post('/api/v1/tick', {
+    source: '10jqka',
+    timestamp: new Date().toISOString(),
+    data,
+  });
+  return res.data;
+}
+
+/** 推送分时历史批量 */
+export async function pushTimeshare(data: TimeshareBatchData): Promise<ApiResponse> {
+  const client = await getClient();
+  const res = await client.post('/api/v1/timeshare', {
     source: '10jqka',
     timestamp: new Date().toISOString(),
     data,

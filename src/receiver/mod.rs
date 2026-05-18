@@ -30,6 +30,7 @@ pub async fn start_server(port: u16) -> anyhow::Result<()> {
         .route("/api/v1/quote", post(handler::push_quote))
         .route("/api/v1/kline", post(handler::push_kline))
         .route("/api/v1/tick", post(handler::push_tick))
+        .route("/api/v1/timeshare", post(handler::push_timeshare))
         .route("/api/v1/orderbook", post(handler::push_orderbook))
         .route("/api/v1/moneyflow", post(handler::push_moneyflow))
         .route("/api/v1/status", get(handler::get_status))

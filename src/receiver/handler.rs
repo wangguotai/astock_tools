@@ -233,6 +233,39 @@ pub async fn push_moneyflow(
     Ok((StatusCode::OK, Json(ApiResponse::ok())))
 }
 
+/// POST /api/v1/timeshare
+pub async fn push_timeshare(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PushRequest<TimeshareBatchData>>,
+) -> Result<(StatusCode, Json<ApiResponse>), StatusCode> {
+    let conn = state.db.lock().await;
+    let mut count = 0;
+
+    for entry in &req.data.points {
+        let code = match StockCode::from_raw(&entry.code) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if let Err(e) = db::timeshare_repo::save_timeshare_point(&conn, &crate::models::timeshare::TimesharePoint {
+            code,
+            trade_time: entry.trade_time.clone(),
+            price: Decimal::from_str(&entry.price).unwrap_or(Decimal::ZERO),
+            volume: entry.volume,
+            avg_price: entry.avg_price.as_ref().and_then(|v| Decimal::from_str(v).ok()),
+            cum_volume: entry.cum_volume,
+        }) {
+            eprintln!("[receiver] 保存分时数据失败: {}", e);
+        } else {
+            count += 1;
+        }
+    }
+
+    Ok((StatusCode::OK, Json(ApiResponse {
+        status: "ok".into(),
+        message: Some(format!("保存{}条分时数据", count)),
+    })))
+}
+
 /// GET /api/v1/status
 pub async fn get_status(
     State(state): State<Arc<AppState>>,

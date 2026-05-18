@@ -156,11 +156,12 @@ function parseTimeData(url: string, body: string, code: string): NormalizedData 
     for (const rec of records) {
       if (!rec) continue;
       const parts = rec.split(',');
-      if (parts.length >= 3) {
+      if (parts.length >= 5) {
         const timeStr = parts[0] as string;
         const price = parts[1] as string;
-        const volume = parseInt(parts[2] as string) || 0;
-        // timeStr 格式: "0930" 或 "1300"，转 HH:MM
+        const cumVolume = parseInt(parts[2] as string) || 0;
+        const avgPrice = parts[3] as string;
+        const volume = parseInt(parts[4] as string) || 0;
         const hh = timeStr.substring(0, 2);
         const mm = timeStr.substring(2, 4);
         ticks.push({
@@ -168,12 +169,14 @@ function parseTimeData(url: string, body: string, code: string): NormalizedData 
           trade_time: `${hh}:${mm}:00`,
           price,
           volume,
+          avg_price: avgPrice,
+          cum_volume: cumVolume,
           direction: 'neutral',
         });
       }
     }
 
-    return ticks.length > 0 ? { type: 'tick', data: { ticks } } : null;
+    return ticks.length > 0 ? { type: 'timeshare', data: { points: ticks } } : null;
   } catch {
     return null;
   }

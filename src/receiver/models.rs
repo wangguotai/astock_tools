@@ -67,6 +67,8 @@ pub struct TickEntry {
     pub trade_time: String,
     pub price: String,
     pub volume: i64,
+    pub avg_price: Option<String>,
+    pub cum_volume: Option<i64>,
     pub direction: Option<String>,
 }
 
@@ -74,6 +76,23 @@ pub struct TickEntry {
 #[derive(Debug, Deserialize)]
 pub struct TickBatchData {
     pub ticks: Vec<TickEntry>,
+}
+
+/// 分时历史数据条目
+#[derive(Debug, Deserialize)]
+pub struct TimeshareEntry {
+    pub code: String,
+    pub trade_time: String,
+    pub price: String,
+    pub volume: i64,
+    pub avg_price: Option<String>,
+    pub cum_volume: Option<i64>,
+}
+
+/// 分时历史批量推送
+#[derive(Debug, Deserialize)]
+pub struct TimeshareBatchData {
+    pub points: Vec<TimeshareEntry>,
 }
 
 /// 盘口快照

@@ -9,6 +9,7 @@ pub mod tick_repo;
 pub mod orderbook_repo;
 pub mod moneyflow_repo;
 pub mod quote_snapshot_repo;
+pub mod timeshare_repo;
 
 use rusqlite::Connection;
 use std::path::PathBuf;

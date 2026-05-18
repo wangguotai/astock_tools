@@ -134,4 +134,16 @@ CREATE TABLE IF NOT EXISTS quote_snapshots (
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_qs_code_time ON quote_snapshots(code, created_at);
+
+CREATE TABLE IF NOT EXISTS timeshare (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    code       TEXT NOT NULL,
+    trade_time TEXT NOT NULL,
+    price      TEXT NOT NULL,
+    volume     INTEGER NOT NULL,
+    avg_price  TEXT,
+    cum_volume INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ts_code_time ON timeshare(code, trade_time);
 "#;

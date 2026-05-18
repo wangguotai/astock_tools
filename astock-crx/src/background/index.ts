@@ -3,7 +3,7 @@
  * 接收拦截数据 → 归一化 → 推送到astock接收端
  */
 import { normalizeData } from '@shared/data-normalizer';
-import { pushQuote, pushKline, pushTicks, pushOrderBook, pushMoneyFlow, checkStatus } from '@shared/api-client';
+import { pushQuote, pushKline, pushTicks, pushTimeshare, pushOrderBook, pushMoneyFlow, checkStatus } from '@shared/api-client';
 import { appendPushLog, setCurrentCode, getCurrentCode } from '@shared/storage';
 import { THROTTLE } from '@shared/constants';
 import type { CapturedDataMessage, PageStockCodeMessage, PopupMessage, PushLogEntry } from '@shared/types';
@@ -15,6 +15,7 @@ const pushState = {
   sentTickIds: {} as Record<string, Set<string>>,
   pushedKline: new Set<string>(),
   pushedMoneyflow: new Set<string>(),
+  pushedTimeshare: new Set<string>(),
 };
 
 // 内存推送日志 (最近20条，快速查询)
@@ -44,6 +45,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     setCurrentCode(msg.code);
     pushState.pushedKline.delete(msg.code);
     pushState.pushedMoneyflow.delete(msg.code);
+    pushState.pushedTimeshare.delete(msg.code);
     pushState.lastQuotePush[msg.code] = 0;
     pushState.lastOrderbookSnapshot[msg.code] = '';
     pushState.sentTickIds[msg.code] = new Set();
@@ -124,6 +126,18 @@ function handleCapturedData(url: string, body: string, status: number) {
       }).catch(() => {
         logPush({ time: beijingNow(), type: 'tick', code, count: newTicks.length, success: false });
       });
+      break;
+    }
+
+    case 'timeshare': {
+      if (!pushState.pushedTimeshare.has(code)) {
+        pushState.pushedTimeshare.add(code);
+        pushTimeshare(result.data).then((r) => {
+          logPush({ time: beijingNow(), type: 'timeshare', code, count: result.data.points.length, success: r.status === 'ok' });
+        }).catch(() => {
+          logPush({ time: beijingNow(), type: 'timeshare', code, count: result.data.points.length, success: false });
+        });
+      }
       break;
     }
 
