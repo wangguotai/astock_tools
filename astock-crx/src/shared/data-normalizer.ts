@@ -300,22 +300,33 @@ function parseQuoteData(url: string, body: string, code: string): NormalizedData
     const astockCode = toAstockCode(code);
     if (!astockCode) return null;
 
-    const data = json.data || json;
+    // realhead 返回结构: { items: { "10": "25.79", "6": "25.09", ... }, time: "...", name: "..." }
+    // items 是扁平 key-value，其他字段在根上
+    const root = json;
+    const it = root.items || root;
+
     const quoteData: QuoteData = {
       code: astockCode,
-      name: data.name ?? data.secname ?? '',
-      price: String(data.price ?? data.currentPrice ?? data.newprice ?? '0'),
-      prev_close: String(data.prevClose ?? data.yesterdayClose ?? data.close ?? '0'),
-      open: String(data.open ?? data.openPrice ?? '0'),
-      high: String(data.high ?? data.highPrice ?? '0'),
-      low: String(data.low ?? data.lowPrice ?? '0'),
-      volume: parseInt(data.volume ?? data.totalVolume ?? 0),
-      turnover: String(data.turnover ?? data.amount ?? data.totalAmount ?? '0'),
-      bid: String(data.bid1 ?? data.buy1Price ?? '0'),
-      ask: String(data.ask1 ?? data.sell1Price ?? '0'),
-      change: String(data.change ?? data.priceChange ?? '0'),
-      change_pct: String(data.changePercent ?? data.priceChangePercent ?? '0'),
-      time: data.time ?? data.updateTime ?? new Date().toISOString().replace('T', ' ').substring(0, 19),
+      name: String(root.name ?? it.name ?? ''),
+      price: String(it['10'] ?? '0'),
+      prev_close: String(it['6'] ?? '0'),
+      open: String(it['7'] ?? '0'),
+      high: String(it['8'] ?? '0'),
+      low: String(it['9'] ?? '0'),
+      volume: parseInt(it['13'] ?? '0') || 0,
+      turnover: String(it['19'] ?? '0'),
+      bid: String(it['24'] ?? '0'),
+      ask: String(it['30'] ?? '0'),
+      bid_vol: parseInt(it['25'] ?? '0') || undefined,
+      ask_vol: parseInt(it['31'] ?? '0') || undefined,
+      change: String(it['199112'] ?? '0'),
+      change_pct: String(it['264648'] ?? '0'),
+      high_limit: String(it['69'] ?? '0'),
+      low_limit: String(it['70'] ?? '0'),
+      inner_vol: parseInt(it['223'] ?? '0') || undefined,
+      outer_vol: parseInt(it['224'] ?? '0') || undefined,
+      open_vol: parseInt(it['15'] ?? '0') || undefined,
+      time: String(root.time ?? it.time ?? ''),
     };
 
     if (quoteData.price === '0') return null;
