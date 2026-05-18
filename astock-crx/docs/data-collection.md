@@ -101,25 +101,48 @@
 
 ---
 
-### 4. 分时历史数据 (tick)
+### 4. 分时成交明细 (tick)
 
-来自分时走势图的历史数据点，每分钟一个点。
+真正逐笔成交，来自交易所推送。
+
+| 字段 | 说明 |
+|------|------|
+| id | 成交单号（数据库唯一标识） |
+| code | 股票代码 |
+| trade_time | 成交时间 (HH:mm:ss) |
+| price | 成交价格 |
+| volume | 成交量 |
+| direction | 方向 (buy/sell/neutral) |
+
+**来源 URL**: `https://d.10jqka.com.cn/v2/exchangedetail/hs_{code}/last12.js`
+**归一化函数**: `parseExchangeDetailData()`
+**推送 API**: `POST /api/v1/tick`
+**实时推送**: 不使用批量延迟，直接推送
+**数据库去重**: `tick_id` 字段设 UNIQUE 约束，重复插入时 `INSERT OR IGNORE` 跳过
+
+---
+
+### 5. 分时历史数据 (timeshare)
+
+分钟级聚合数据，来自分时走势图的实时刷新接口。
 
 | 字段 | 说明 |
 |------|------|
 | code | 股票代码 |
 | trade_time | 时间 (HH:mm:ss) |
 | price | 价格 |
-| volume | 成交量 |
-| direction | 固定 neutral |
+| volume | 当分钟成交量 |
+| avg_price | 均价 |
+| cum_volume | 累计成交量 |
 
-**来源 URL**: `https://d.10jqka.com.cn/v2/line/hs_{code}/01/last.js`
-**归一化函数**: `parseTimeshareData()`
-**数据结构**: `data.trends` 数组，每项格式 `YYYYMMDDHHmmss,price,volume`
+**来源 URL**: `https://d.10jqka.com.cn/v6/time/hs_{code}/defer/last.js`
+**归一化函数**: `parseTimeData()`
+**推送 API**: `POST /api/v1/timeshare`
+**只推送一次**: 首此加载时推送，后续同 session 内不重复推送
 
 ---
 
-### 5. K线数据 (kline)
+### 6. K线数据 (kline)
 
 | 字段 | 说明 |
 |------|------|
@@ -138,7 +161,7 @@
 
 ---
 
-### 6. 资金流向 (moneyflow)
+### 7. 资金流向 (moneyflow)
 
 | 字段 | 说明 |
 |------|------|
@@ -154,7 +177,7 @@
 
 ---
 
-### 7. 其他盘口 (orderbook)
+### 8. 其他盘口 (orderbook)
 
 作为 fallback 处理非 fiverange 的盘口数据。
 
@@ -170,7 +193,7 @@
 |---------|---------|-----------|
 | `/fiverange/` | 五档盘口 | `parseFiverangeData` |
 | `/exchangedetail/` | 分时成交明细 | `parseExchangeDetailData` |
-| `/line/` + `/01/` | 分时历史 | `parseTimeshareData` |
+| `/v6/time/` | 分时历史 | `parseTimeData` |
 | `/line/` + `/11/` 或 `/21/` | K线 | `parseKlineData` |
 | `/moneyflow/` | 资金流向 | `parseMoneyFlowData` |
 | `/trade/` 或 `/detail` | 盘口(fallback) | `parseOrderBookData` |
