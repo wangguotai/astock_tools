@@ -146,7 +146,8 @@ function parseTimeData(url: string, body: string, code: string): NormalizedData 
     if (!astockCode) return null;
 
     // v6/time 返回结构: { "hs_002202": { data: "0930,25.00,21022500,...", ... } }
-    const stockData = json[code] || json;
+    const key = `hs_${code}`;
+    const stockData = json[key] || json;
     const rawData = String(stockData.data || '');
     if (!rawData) return null;
 
@@ -314,7 +315,10 @@ function parseMoneyFlowData(url: string, body: string, code: string): Normalized
     const astockCode = toAstockCode(code);
     if (!astockCode) return null;
 
-    const data = json.data || json;
+    // moneyflow 返回结构: { "hs_002202": { data: {...}, ... }, "hs_300750": {...} }
+    const mfKey = `hs_${code}`;
+    const mfStockData = json[mfKey] || json;
+    const data = mfStockData.data || mfStockData;
     const mfData: MoneyFlowData = {
       code: astockCode,
       trade_date: new Date().toISOString().substring(0, 10),
