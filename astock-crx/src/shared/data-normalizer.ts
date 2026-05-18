@@ -137,6 +137,47 @@ function parseExchangeDetailData(url: string, body: string, code: string): Norma
   }
 }
 
+/** 解析分时数据 (v6/time 接口) */
+function parseTimeData(url: string, body: string, code: string): NormalizedData | null {
+  try {
+    const json = extractJsonFromJsonp(body);
+    if (!json) return null;
+    const astockCode = toAstockCode(code);
+    if (!astockCode) return null;
+
+    // v6/time 返回结构: { "hs_002202": { data: "0930,25.00,21022500,...", ... } }
+    const stockData = json[code] || json;
+    const rawData = String(stockData.data || '');
+    if (!rawData) return null;
+
+    const ticks: TickEntry[] = [];
+    const records = rawData.split(';');
+    for (const rec of records) {
+      if (!rec) continue;
+      const parts = rec.split(',');
+      if (parts.length >= 3) {
+        const timeStr = parts[0] as string;
+        const price = parts[1] as string;
+        const volume = parseInt(parts[2] as string) || 0;
+        // timeStr 格式: "0930" 或 "1300"，转 HH:MM
+        const hh = timeStr.substring(0, 2);
+        const mm = timeStr.substring(2, 4);
+        ticks.push({
+          code: astockCode,
+          trade_time: `${hh}:${mm}:00`,
+          price,
+          volume,
+          direction: 'neutral',
+        });
+      }
+    }
+
+    return ticks.length > 0 ? { type: 'tick', data: { ticks } } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 解析分时数据 */
 function parseTimeshareData(url: string, body: string, code: string): NormalizedData | null {
   try {
@@ -348,6 +389,9 @@ export function normalizeData(url: string, body: string): NormalizedData | null 
   }
   if (url.includes('/exchangedetail/')) {
     return parseExchangeDetailData(url, body, code);
+  }
+  if (url.includes('/v6/time/')) {
+    return parseTimeData(url, body, code);
   }
   if (url.includes('/line/') && url.includes('/01/')) {
     return parseTimeshareData(url, body, code);

@@ -20,15 +20,17 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://stockpage.10jqka.com.cn/*"],
+      "matches": ["https://stockpage.10jqka.com.cn/*", "https://*.10jqka.com.cn/*"],
       "js": ["src/content/injector.ts"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     },
     {
-      "matches": ["https://stockpage.10jqka.com.cn/*"],
+      "matches": ["https://stockpage.10jqka.com.cn/*", "https://*.10jqka.com.cn/*"],
       "js": ["src/content/interceptor.ts"],
       "run_at": "document_start",
-      "world": "MAIN"
+      "world": "MAIN",
+      "all_frames": true
     }
   ],
   "action": {
