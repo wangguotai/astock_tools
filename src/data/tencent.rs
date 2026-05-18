@@ -100,6 +100,8 @@ pub fn parse_tencent_quotes(raw: &str, _codes: &[StockCode]) -> Vec<Quote> {
                     outer_vol: None,
                     open_vol: None,
                     time: String::new(),
+                    update_time: None,
+                    stock_status: None,
                 });
             }
         }

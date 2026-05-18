@@ -29,11 +29,13 @@ export interface QuoteData {
   change?: string;         // 涨跌额
   change_pct?: string;    // 涨跌幅
   high_limit?: string;     // 涨停价
-  low_limit?: string;       // 跌停价
+  low_limit?: string;      // 跌停价
   inner_vol?: number;      // 内盘（主动卖出量）
   outer_vol?: number;      // 外盘（主动买入量）
-  open_vol?: number;       // 开盘成交量
+  open_vol?: number;      // 开盘成交量
   time?: string;           // 更新时间
+  update_time?: string;   // 同花顺 updateTime 字段
+  stock_status?: string;   // 交易状态：连续竞价/闭市/休市
 }
 
 /** K线条目 */

@@ -9,8 +9,8 @@ use std::str::FromStr;
 pub fn save_quote_snapshot(conn: &Connection, quote: &Quote, source: &str) -> anyhow::Result<()> {
     let code = quote.code.for_api();
     conn.execute(
-        "INSERT INTO quote_snapshots (code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time, source)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+        "INSERT INTO quote_snapshots (code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time, update_time, stock_status, source)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
         params![
             code,
             quote.name,
@@ -33,6 +33,8 @@ pub fn save_quote_snapshot(conn: &Connection, quote: &Quote, source: &str) -> an
             quote.outer_vol,
             quote.open_vol,
             quote.time,
+            quote.update_time,
+            quote.stock_status,
             source,
         ],
     )?;
@@ -46,7 +48,7 @@ pub fn get_latest_snapshot(
 ) -> anyhow::Result<Option<Quote>> {
     let code_str = code.for_api();
     let mut stmt = conn.prepare(
-        "SELECT code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time
+        "SELECT code, name, price, prev_close, open, high, low, volume, turnover, bid, ask, bid_vol, ask_vol, change_val, change_pct, high_limit, low_limit, inner_vol, outer_vol, open_vol, quote_time, update_time, stock_status
          FROM quote_snapshots WHERE code = ?1 ORDER BY created_at DESC LIMIT 1"
     )?;
 
@@ -73,6 +75,8 @@ pub fn get_latest_snapshot(
             outer_vol: row.get(18)?,
             open_vol: row.get(19)?,
             time: row.get(20)?,
+            update_time: row.get(21)?,
+            stock_status: row.get(22)?,
         })
     });
 

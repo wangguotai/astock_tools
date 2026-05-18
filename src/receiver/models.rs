@@ -36,6 +36,8 @@ pub struct QuoteData {
     pub outer_vol: Option<i64>,
     pub open_vol: Option<i64>,
     pub time: Option<String>,
+    pub update_time: Option<String>,
+    pub stock_status: Option<String>,
 }
 
 /// K线数据条目

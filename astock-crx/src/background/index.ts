@@ -81,6 +81,11 @@ function handleCapturedData(url: string, body: string, status: number) {
 
   switch (result.type) {
     case 'quote': {
+      // 非交易时段（闭市、停牌等）跳过
+      const status = (result.data as any).stock_status;
+      if (status === '闭市' || status === '停牌' || !status) {
+        break;
+      }
       const lastPush = pushState.lastQuotePush[code] || 0;
       if (now - lastPush >= THROTTLE.quote) {
         pushState.lastQuotePush[code] = now;

@@ -128,6 +128,8 @@ CREATE TABLE IF NOT EXISTS quote_snapshots (
     outer_vol   INTEGER,
     open_vol    INTEGER,
     quote_time  TEXT DEFAULT '',
+    update_time TEXT,
+    stock_status TEXT,
     source      TEXT NOT NULL DEFAULT '10jqka',
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );

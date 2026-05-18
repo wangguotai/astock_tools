@@ -56,9 +56,15 @@ pub async fn push_quote(
         outer_vol: req.data.outer_vol,
         open_vol: req.data.open_vol,
         time: req.data.time.unwrap_or_default(),
+        update_time: req.data.update_time.clone(),
+        stock_status: req.data.stock_status.clone(),
     };
 
     let conn = state.db.lock().await;
+    // 非交易时段（闭市、停牌）跳过保存
+    if req.data.stock_status.as_deref() == Some("闭市") || req.data.stock_status.as_deref() == Some("停牌") {
+        return Ok((StatusCode::OK, Json(ApiResponse::ok())));
+    }
     if let Err(e) = db::quote_snapshot_repo::save_quote_snapshot(&conn, &quote, &req.source) {
         eprintln!("[receiver] 保存行情快照失败: {}", e);
         return Ok((StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::error("保存失败"))));

@@ -327,6 +327,8 @@ function parseQuoteData(url: string, body: string, code: string): NormalizedData
       outer_vol: parseInt(it['224'] ?? '0') || undefined,
       open_vol: parseInt(it['15'] ?? '0') || undefined,
       time: String(root.time ?? it.time ?? ''),
+      update_time: String(root.updateTime ?? it.updateTime ?? ''),
+      stock_status: String(root.stockStatus ?? it.stockStatus ?? ''),
     };
 
     if (quoteData.price === '0') return null;

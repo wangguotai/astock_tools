@@ -45,6 +45,10 @@ pub struct Quote {
     pub open_vol: Option<i64>,
     /// 数据时间
     pub time: String,
+    /// 同花顺 updateTime 字段
+    pub update_time: Option<String>,
+    /// 交易状态：连续竞价/闭市/休市
+    pub stock_status: Option<String>,
 }
 
 impl Quote {
