@@ -3,6 +3,7 @@ import ConnectionStatus from './components/ConnectionStatus'
 import StockInfo from './components/StockInfo'
 import PushLog from './components/PushLog'
 import Settings from './components/Settings'
+import AlertPanel from './components/AlertPanel'
 import type { StatusResponse, PushLogEntry } from '@shared/types'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
       <h1 className="text-base font-bold text-blue-600">astock Bridge</h1>
       <ConnectionStatus status={status} />
       <StockInfo code={currentCode} />
+      <AlertPanel currentCode={currentCode} />
       <PushLog entries={pushLog} />
       <Settings onSaved={refresh} />
     </div>

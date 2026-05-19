@@ -1,12 +1,15 @@
 /// HTTP接收端处理函数
 use crate::db;
+use crate::models::bar::Bar;
 use crate::models::stock::StockCode;
 use crate::monitor::notifier;
 use crate::receiver::models::*;
+use crate::analysis::indicators::{calc_ma_bundle, calc_rsi14, detect_cross, CrossType};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
@@ -108,6 +111,10 @@ pub async fn push_kline(
         if let Err(e) = db::bar_repo::save_bars(&conn, &bars) {
             eprintln!("[receiver] 保存K线失败: {}", e);
             return Ok((StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::error("保存失败"))));
+        }
+        // 检查技术指标告警
+        for bar in &bars {
+            check_indicator_alerts(&conn, bar);
         }
     }
 
@@ -230,6 +237,9 @@ pub async fn push_moneyflow(
         return Ok((StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::error("保存失败"))));
     }
 
+    // 检查资金流向告警
+    check_moneyflow_alerts(&conn, &mf);
+
     Ok((StatusCode::OK, Json(ApiResponse::ok())))
 }
 
@@ -308,7 +318,6 @@ fn check_price_alerts(conn: &rusqlite::Connection, quote: &crate::models::quote:
             "price_above" => {
                 let params: serde_json::Value = serde_json::from_str(&rule.params).unwrap_or_default();
                 let target = params["price"].as_f64().unwrap_or(0.0);
-                use rust_decimal::prelude::ToPrimitive;
                 let price_f64 = quote.price.to_f64().unwrap_or(0.0);
                 if price_f64 > target {
                     let msg = format!("{} {} 突破价格{}", quote.code.display_wind(), quote.name, target);
@@ -320,13 +329,148 @@ fn check_price_alerts(conn: &rusqlite::Connection, quote: &crate::models::quote:
             "price_below" => {
                 let params: serde_json::Value = serde_json::from_str(&rule.params).unwrap_or_default();
                 let target = params["price"].as_f64().unwrap_or(0.0);
-                use rust_decimal::prelude::ToPrimitive;
                 let price_f64 = quote.price.to_f64().unwrap_or(0.0);
                 if price_f64 < target {
                     let msg = format!("{} {} 跌破价格{}", quote.code.display_wind(), quote.name, target);
                     notifier::send_alert("价格预警", &msg);
                     println!("[预警] {}", msg);
                     let _ = db::alert_repo::record_alert(conn, Some(rule.id), &quote.code.for_api(), "price_below", &msg);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 检查技术指标预警
+fn check_indicator_alerts(conn: &rusqlite::Connection, new_bar: &Bar) {
+    let rules = match db::alert_repo::list_enabled_rules(conn) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    // 获取该股票最近 30 根 K 线用于计算指标
+    let code_str = new_bar.code.for_api();
+    let bars = match db::bar_repo::query_bars(conn, &new_bar.code, None, None) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+
+    if bars.len() < 21 {
+        return; // 需要至少 21 根才能计算 MA10 和 RSI
+    }
+
+    let ma = calc_ma_bundle(&bars);
+    let rsi = calc_rsi14(&bars);
+    let cross = detect_cross(&bars);
+
+    for rule in &rules {
+        if rule.code != code_str {
+            continue;
+        }
+
+        let params: serde_json::Value = serde_json::from_str(&rule.params).unwrap_or_default();
+
+        match rule.signal_type.as_str() {
+            "MA_GOLDEN_CROSS" => {
+                if let Some(c) = &cross {
+                    if c.cross_type == CrossType::GoldenCross {
+                        let msg = format!("{} MA5 上穿 MA10 金叉 (MA5={:.2} MA10={:.2})",
+                            new_bar.code.display_wind(), c.ma5_after, c.ma10_after);
+                        notifier::send_alert("均线金叉", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MA_GOLDEN_CROSS", &msg);
+                    }
+                }
+            }
+            "MA_DEAD_CROSS" => {
+                if let Some(c) = &cross {
+                    if c.cross_type == CrossType::DeadCross {
+                        let msg = format!("{} MA5 下穿 MA10 死叉 (MA5={:.2} MA10={:.2})",
+                            new_bar.code.display_wind(), c.ma5_after, c.ma10_after);
+                        notifier::send_alert("均线死叉", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MA_DEAD_CROSS", &msg);
+                    }
+                }
+            }
+            "RSI_OVERBOUGHT" => {
+                if let Some(r) = rsi {
+                    let threshold = params["value"].as_f64().unwrap_or(70.0);
+                    if r > threshold {
+                        let msg = format!("{} RSI 超买 RSI={:.1} > {:.0}", new_bar.code.display_wind(), r, threshold);
+                        notifier::send_alert("RSI超买", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "RSI_OVERBOUGHT", &msg);
+                    }
+                }
+            }
+            "RSI_OVERSOLD" => {
+                if let Some(r) = rsi {
+                    let threshold = params["value"].as_f64().unwrap_or(30.0);
+                    if r < threshold {
+                        let msg = format!("{} RSI 超卖 RSI={:.1} < {:.0}", new_bar.code.display_wind(), r, threshold);
+                        notifier::send_alert("RSI超卖", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "RSI_OVERSOLD", &msg);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 检查资金流向告警
+fn check_moneyflow_alerts(conn: &rusqlite::Connection, mf: &crate::models::money_flow::MoneyFlow) {
+    let rules = match db::alert_repo::list_enabled_rules(conn) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    let code_str = mf.code.for_api();
+    let main_net_f64 = mf.main_net.to_f64().unwrap_or(0.0);
+
+    for rule in &rules {
+        if rule.code != code_str {
+            continue;
+        }
+
+        let params: serde_json::Value = serde_json::from_str(&rule.params).unwrap_or_default();
+
+        match rule.signal_type.as_str() {
+            "MONEYFLOW_IN" => {
+                let threshold = params["threshold"].as_f64().unwrap_or(1_000_000.0) * 10_000.0;
+                if main_net_f64 > threshold {
+                    let net_str = if main_net_f64.abs() >= 100_000_000.0 {
+                        format!("{:.2}亿", main_net_f64 / 100_000_000.0)
+                    } else if main_net_f64.abs() >= 10_000.0 {
+                        format!("{:.2}万", main_net_f64 / 10_000.0)
+                    } else {
+                        format!("{:.2}", main_net_f64)
+                    };
+                    let msg = format!("{} 主力净流入 {} (阈值{:.0}万)",
+                        mf.code.display_wind(), net_str, threshold / 10_000.0);
+                    notifier::send_alert("资金流入", &msg);
+                    println!("[预警] {}", msg);
+                    let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MONEYFLOW_IN", &msg);
+                }
+            }
+            "MONEYFLOW_OUT" => {
+                let threshold = params["threshold"].as_f64().unwrap_or(1_000_000.0) * 10_000.0;
+                if main_net_f64 < -threshold {
+                    let net_str = if main_net_f64.abs() >= 100_000_000.0 {
+                        format!("{:.2}亿", main_net_f64 / 100_000_000.0)
+                    } else if main_net_f64.abs() >= 10_000.0 {
+                        format!("{:.2}万", main_net_f64 / 10_000.0)
+                    } else {
+                        format!("{:.2}", main_net_f64)
+                    };
+                    let msg = format!("{} 主力净流出 {} (阈值{:.0}万)",
+                        mf.code.display_wind(), net_str, threshold / 10_000.0);
+                    notifier::send_alert("资金流出", &msg);
+                    println!("[预警] {}", msg);
+                    let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MONEYFLOW_OUT", &msg);
                 }
             }
             _ => {}

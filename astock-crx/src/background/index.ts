@@ -7,6 +7,7 @@ import { pushQuote, pushKline, pushTicks, pushTimeshare, pushOrderBook, pushMone
 import { appendPushLog, setCurrentCode, getCurrentCode } from '@shared/storage';
 import { THROTTLE } from '@shared/constants';
 import type { CapturedDataMessage, PageStockCodeMessage, PopupMessage, PushLogEntry } from '@shared/types';
+import { getAlertRules, setAlertRules, getAlertHistory, setAlertHistory } from '@shared/storage';
 
 // 推送节流状态
 const pushState = {
@@ -37,7 +38,7 @@ function logPush(entry: PushLogEntry) {
 }
 
 // 监听content script消息
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => {
   const msg = message as CapturedDataMessage | PageStockCodeMessage | PopupMessage;
   if (msg.type === 'CAPTURED_DATA') {
     handleCapturedData(msg.url, msg.body, msg.status);
@@ -64,6 +65,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     pushState.pushedKline.clear();
     pushState.pushedMoneyflow.clear();
     sendResponse({ status: 'ok' });
+  } else if (msg.type === 'GET_ALERT_RULES') {
+    getAlertRules().then(sendResponse);
+    return true;
+  } else if (msg.type === 'ADD_ALERT_RULE') {
+    const rules = await getAlertRules();
+    const newRule = {
+      id: Date.now(),
+      code: msg.code,
+      signal_type: msg.signal_type,
+      params: msg.params,
+      enabled: true,
+    };
+    rules.push(newRule);
+    await setAlertRules(rules);
+    sendResponse({ status: 'ok', rule: newRule });
+  } else if (msg.type === 'DELETE_ALERT_RULE') {
+    const rules = await getAlertRules();
+    const filtered = rules.filter(r => r.id !== msg.id);
+    await setAlertRules(filtered);
+    sendResponse({ status: 'ok' });
+  } else if (msg.type === 'GET_ALERT_HISTORY') {
+    getAlertHistory().then(sendResponse);
+    return true;
   }
 
   return false;

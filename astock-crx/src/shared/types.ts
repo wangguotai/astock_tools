@@ -173,11 +173,52 @@ export type PopupMessage =
   | { type: 'GET_PUSH_LOG' }
   | { type: 'GET_STATUS' }
   | { type: 'GET_CURRENT_CODE' }
-  | { type: 'FORCE_PUSH' };
+  | { type: 'FORCE_PUSH' }
+  | { type: 'GET_ALERT_RULES' }
+  | { type: 'ADD_ALERT_RULE'; code: string; signal_type: AlertSignalType; params: AlertRuleParams }
+  | { type: 'DELETE_ALERT_RULE'; id: number }
+  | { type: 'GET_ALERT_HISTORY' }
+  | { type: 'GET_WATCHLIST' };
 
 /** 存储键 */
 export interface StorageSchema {
   astock_server_url: string;
   astock_push_log: PushLogEntry[];
   astock_current_code: string | null;
+}
+
+/** 告警规则类型 */
+export type AlertSignalType =
+  | 'price_above'   // 价格突破上限
+  | 'price_below'   // 价格跌破下限
+  | 'MA_GOLDEN_CROSS'  // MA5 上穿 MA10 金叉
+  | 'MA_DEAD_CROSS'    // MA5 下穿 MA10 死叉
+  | 'RSI_OVERBOUGHT'   // RSI 超买
+  | 'RSI_OVERSOLD'     // RSI 超卖
+  | 'MONEYFLOW_IN'     // 主力净流入
+  | 'MONEYFLOW_OUT';   // 主力净流出
+
+/** 告警规则参数 */
+export interface AlertRuleParams {
+  price?: number;        // price_above/below 阈值
+  value?: number;         // RSI 阈值
+  threshold?: number;     // 资金流向阈值（万元）
+}
+
+/** 告警规则 */
+export interface AlertRule {
+  id: number;
+  code: string;
+  signal_type: AlertSignalType;
+  params: AlertRuleParams;
+  enabled: boolean;
+}
+
+/** 告警历史 */
+export interface AlertHistory {
+  id: number;
+  code: string;
+  signal_type: string;
+  message: string;
+  triggered_at: string;
 }
