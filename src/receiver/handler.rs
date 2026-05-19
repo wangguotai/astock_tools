@@ -4,7 +4,7 @@ use crate::models::bar::Bar;
 use crate::models::stock::StockCode;
 use crate::monitor::notifier;
 use crate::receiver::models::*;
-use crate::analysis::indicators::{calc_ma_bundle, calc_rsi14, detect_cross, CrossType};
+use crate::analysis::indicators::{calc_ma_bundle, calc_rsi14, detect_cross, detect_macd_cross, CrossType, MacdCrossType};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -356,13 +356,14 @@ fn check_indicator_alerts(conn: &rusqlite::Connection, new_bar: &Bar) {
         Err(_) => return,
     };
 
-    if bars.len() < 21 {
-        return; // 需要至少 21 根才能计算 MA10 和 RSI
+    if bars.len() < 35 {
+        return; // 需要至少 35 根才能计算 MACD
     }
 
     let ma = calc_ma_bundle(&bars);
     let rsi = calc_rsi14(&bars);
     let cross = detect_cross(&bars);
+    let macd_cross = detect_macd_cross(&bars);
 
     for rule in &rules {
         if rule.code != code_str {
@@ -413,6 +414,28 @@ fn check_indicator_alerts(conn: &rusqlite::Connection, new_bar: &Bar) {
                         notifier::send_alert("RSI超卖", &msg);
                         println!("[预警] {}", msg);
                         let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "RSI_OVERSOLD", &msg);
+                    }
+                }
+            }
+            "MACD_GOLDEN_CROSS" => {
+                if let Some(c) = &macd_cross {
+                    if c.cross_type == MacdCrossType::GoldenCross {
+                        let msg = format!("{} MACD 金叉 (DIF={:.3} DEA={:.3} 柱={:.3})",
+                            new_bar.code.display_wind(), c.dif_after, c.dea_after, c.hist_after);
+                        notifier::send_alert("MACD金叉", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MACD_GOLDEN_CROSS", &msg);
+                    }
+                }
+            }
+            "MACD_DEAD_CROSS" => {
+                if let Some(c) = &macd_cross {
+                    if c.cross_type == MacdCrossType::DeadCross {
+                        let msg = format!("{} MACD 死叉 (DIF={:.3} DEA={:.3} 柱={:.3})",
+                            new_bar.code.display_wind(), c.dif_after, c.dea_after, c.hist_after);
+                        notifier::send_alert("MACD死叉", &msg);
+                        println!("[预警] {}", msg);
+                        let _ = db::alert_repo::record_alert(conn, Some(rule.id), &code_str, "MACD_DEAD_CROSS", &msg);
                     }
                 }
             }

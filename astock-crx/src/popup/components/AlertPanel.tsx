@@ -10,6 +10,8 @@ const SIGNAL_TYPES: { type: AlertSignalType; label: string; desc: string }[] = [
   { type: 'MA_DEAD_CROSS', label: 'MA死叉', desc: 'MA5下穿MA10' },
   { type: 'RSI_OVERBOUGHT', label: 'RSI超买', desc: 'RSI > 70' },
   { type: 'RSI_OVERSOLD', label: 'RSI超卖', desc: 'RSI < 30' },
+  { type: 'MACD_GOLDEN_CROSS', label: 'MACD金叉', desc: 'DIF上穿DEA' },
+  { type: 'MACD_DEAD_CROSS', label: 'MACD死叉', desc: 'DIF下穿DEA' },
   { type: 'MONEYFLOW_IN', label: '主力流入', desc: '净流入超过阈值(万元)' },
   { type: 'MONEYFLOW_OUT', label: '主力流出', desc: '净流出超过阈值(万元)' },
 ]
@@ -28,11 +30,11 @@ export default function AlertPanel({ currentCode }: Props) {
 
   const loadData = async () => {
     const [r, h] = await Promise.all([
-      new Promise<AlertRule[]>(res => chrome.runtime.sendMessage({ type: 'GET_ALERT_RULES' }, res)),
-      new Promise<AlertHistory[]>(res => chrome.runtime.sendMessage({ type: 'GET_ALERT_HISTORY' }, res)),
+      new Promise<AlertRule[]>(res => chrome.runtime.sendMessage({ type: 'GET_ALERT_RULES' }, (r: AlertRule[]) => res(r || []))),
+      new Promise<AlertHistory[]>(res => chrome.runtime.sendMessage({ type: 'GET_ALERT_HISTORY' }, (h: AlertHistory[]) => res(h || []))),
     ])
-    setRules(r || [])
-    setHistory(h || [])
+    setRules(Array.isArray(r) ? r : [])
+    setHistory(Array.isArray(h) ? h : [])
   }
 
   const handleAddRule = async () => {

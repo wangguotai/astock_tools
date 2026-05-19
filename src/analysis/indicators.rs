@@ -218,3 +218,75 @@ pub fn detect_cross(bars: &[Bar]) -> Option<CrossResult> {
         _ => None,
     }
 }
+
+/// MACD 交叉类型
+#[derive(Debug, Clone, PartialEq)]
+pub enum MacdCrossType {
+    GoldenCross, // 金叉：DIF 上穿 DEA（histogram 由负转正）
+    DeadCross,   // 死叉：DIF 下穿 DEA（histogram 由正转负）
+}
+
+/// MACD 交叉检测结果
+#[derive(Debug, Clone)]
+pub struct MacdCrossResult {
+    pub cross_type: MacdCrossType,
+    pub dif_before: f64,
+    pub dea_before: f64,
+    pub dif_after: f64,
+    pub dea_after: f64,
+    pub hist_before: f64,
+    pub hist_after: f64,
+}
+
+/// 检测 MACD 交叉 (DIF 与 DEA)
+pub fn detect_macd_cross(bars: &[Bar]) -> Option<MacdCrossResult> {
+    if bars.len() < 35 {
+        return None; // 需要足够的K线计算MACD
+    }
+
+    use crate::analysis::macd::compute_macd;
+    let results = compute_macd(bars, 12, 26, 9);
+
+    if bars.len() < 2 || results.len() < 2 {
+        return None;
+    }
+
+    // 取前一根和当前
+    let prev = &results[results.len() - 2];
+    let curr = &results[results.len() - 1];
+
+    let (dif_b, dea_b, hist_b) = match (prev.dif, prev.dea, prev.histogram) {
+        (Some(d), Some(de), Some(h)) => (d.to_f64().unwrap_or(0.0), de.to_f64().unwrap_or(0.0), h.to_f64().unwrap_or(0.0)),
+        _ => return None,
+    };
+    let (dif_c, dea_c, hist_c) = match (curr.dif, curr.dea, curr.histogram) {
+        (Some(d), Some(de), Some(h)) => (d.to_f64().unwrap_or(0.0), de.to_f64().unwrap_or(0.0), h.to_f64().unwrap_or(0.0)),
+        _ => return None,
+    };
+
+    // 金叉：前一根 histogram <= 0，当前 histogram > 0
+    if hist_b <= 0.0 && hist_c > 0.0 {
+        return Some(MacdCrossResult {
+            cross_type: MacdCrossType::GoldenCross,
+            dif_before: dif_b,
+            dea_before: dea_b,
+            dif_after: dif_c,
+            dea_after: dea_c,
+            hist_before: hist_b,
+            hist_after: hist_c,
+        });
+    }
+    // 死叉：前一根 histogram >= 0，当前 histogram < 0
+    if hist_b >= 0.0 && hist_c < 0.0 {
+        return Some(MacdCrossResult {
+            cross_type: MacdCrossType::DeadCross,
+            dif_before: dif_b,
+            dea_before: dea_b,
+            dif_after: dif_c,
+            dea_after: dea_c,
+            hist_before: hist_b,
+            hist_after: hist_c,
+        });
+    }
+    None
+}

@@ -195,6 +195,8 @@ export type AlertSignalType =
   | 'MA_DEAD_CROSS'    // MA5 下穿 MA10 死叉
   | 'RSI_OVERBOUGHT'   // RSI 超买
   | 'RSI_OVERSOLD'     // RSI 超卖
+  | 'MACD_GOLDEN_CROSS' // MACD 金叉
+  | 'MACD_DEAD_CROSS'   // MACD 死叉
   | 'MONEYFLOW_IN'     // 主力净流入
   | 'MONEYFLOW_OUT';   // 主力净流出
 
