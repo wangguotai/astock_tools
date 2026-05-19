@@ -56,8 +56,7 @@ chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => {
     checkStatus().then(sendResponse);
     return true; // 异步响应
   } else if (msg.type === 'GET_CURRENT_CODE') {
-    getCurrentCode().then(sendResponse);
-    return true;
+    return getCurrentCode();
   } else if (msg.type === 'FORCE_PUSH') {
     pushState.lastQuotePush = {};
     pushState.lastOrderbookSnapshot = {};

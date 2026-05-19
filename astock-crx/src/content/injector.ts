@@ -18,7 +18,9 @@ window.addEventListener('message', (event) => {
 
 // 通知background当前页面的股票代码
 function notifyStockCode() {
-  const match = window.location.pathname.match(/\/(\d{6})\/?/);
+  // 只匹配 stockpage.10jqka.com.cn/{6位股票代码} 格式的URL
+  const match = window.location.hostname.match(/^stockpage\.10jqka\.com\.cn$/) &&
+                window.location.pathname.match(/^\/(\d{6})\/?$/);
   if (match) {
     chrome.runtime.sendMessage({
       type: 'PAGE_STOCK_CODE',
@@ -41,4 +43,4 @@ urlObserver.observe(document.body || document.documentElement, {
   childList: true,
   subtree: true,
 });
-console.log()
+console.log('[astock] injector loaded');

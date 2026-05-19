@@ -19,8 +19,10 @@ export default function App() {
             if (res) setStatus(res)
         })
         chrome.runtime.sendMessage({type: 'GET_CURRENT_CODE'}, (res) => {
-            debugger;
-            if (res) setCurrentCode(res)
+            // res 可能是 boolean（如 true）或 string，确保只接受有效的6位股票代码
+            if (typeof res === 'string' && /^\d{6}$/.test(res)) {
+              setCurrentCode(res)
+            }
         })
         chrome.runtime.sendMessage({type: 'GET_PUSH_LOG'}, (res) => {
             if (res) setPushLog(res)
