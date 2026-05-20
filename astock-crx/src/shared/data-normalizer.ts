@@ -310,7 +310,7 @@ function parseOrderBookData(url: string, body: string, code: string): Normalized
   }
 }
 
-/** 解析资金流向 */
+/** 解析资金流向 (realFunds API 或旧 moneyflow JSONP) */
 function parseMoneyFlowData(url: string, body: string, code: string): NormalizedData | null {
   try {
     const json = extractJsonFromJsonp(body);
@@ -318,10 +318,43 @@ function parseMoneyFlowData(url: string, body: string, code: string): Normalized
     const astockCode = toAstockCode(code);
     if (!astockCode) return null;
 
-    // moneyflow 返回结构: { "hs_002202": { data: {...}, ... }, "hs_300750": {...} }
+    // realFunds API: { flash: [...], title: { zlr, zlc, je }, field: {...} }
+    if (json.title) {
+      const flash = json.flash || [];
+      // flash 顺序: 大单流出, 中单流出, 小单流出, 小单流入, 中单流入, 大单流入
+      const bigOut  = flash.find((f: any) => f.name === '大单流出');
+      const bigIn   = flash.find((f: any) => f.name === '大单流入');
+      const midOut  = flash.find((f: any) => f.name === '中单流出');
+      const midIn   = flash.find((f: any) => f.name === '中单流入');
+      const smlOut  = flash.find((f: any) => f.name === '小单流出');
+      const smlIn   = flash.find((f: any) => f.name === '小单流入');
+
+      const mainIn  = parseFloat(bigIn?.sr ?? '0') || 0;
+      const mainOut = parseFloat(bigOut?.sr ?? '0') || 0;
+      // 散户 = 小单
+      const retailIn  = parseFloat(smlIn?.sr ?? '0') || 0;
+      const retailOut = parseFloat(smlOut?.sr ?? '0') || 0;
+
+      const mfData: MoneyFlowData = {
+        code: astockCode,
+        trade_date: new Date().toISOString().substring(0, 10),
+        main_inflow: String(mainIn),
+        main_outflow: String(mainOut),
+        main_net: String(mainIn - mainOut),
+        retail_inflow: String(retailIn),
+        retail_outflow: String(retailOut),
+        retail_net: String(retailIn - retailOut),
+      };
+
+      if (mfData.main_inflow === '0' && mfData.main_outflow === '0') return null;
+      return { type: 'moneyflow', data: mfData };
+    }
+
+    // 旧 moneyflow JSONP: { "hs_002202": { data: {...} } }
     const mfKey = `hs_${code}`;
     const mfStockData = json[mfKey] || json;
     const data = mfStockData.data || mfStockData;
+    if (!data || typeof data === 'string') return null;
     const mfData: MoneyFlowData = {
       code: astockCode,
       trade_date: new Date().toISOString().substring(0, 10),
@@ -400,7 +433,7 @@ export function normalizeData(url: string, body: string): NormalizedData | null 
   if (url.includes('/v6/time/')) {
     return parseTimeData(url, body, code);
   }
-  if (url.includes('/moneyflow/')) {
+  if (url.includes('/Funds/realFunds')) {
     return parseMoneyFlowData(url, body, code);
   }
   return parseQuoteData(url, body, code);

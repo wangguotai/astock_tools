@@ -5,3 +5,8 @@ pub mod tick_trade;
 pub mod order_book;
 pub mod money_flow;
 pub mod timeshare;
+pub mod margin;
+pub mod research;
+pub mod dragon_tiger;
+pub mod block_trade;
+pub mod insider;

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>astock · 已实现功能速查</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'JetBrains Mono','SF Mono','Fira Code',monospace;background:#0d1117;color:#c9d1d9;line-height:1.6;font-size:14px}
+.container{max-width:960px;margin:0 auto;padding:24px 32px}
+
+/* Hero */
+.hero{border-bottom:1px solid #21262d;padding-bottom:20px;margin-bottom:16px}
+.hero h1{font-size:28px;color:#58a6ff;font-weight:700;letter-spacing:-0.5px}
+.hero p{color:#8b949e;margin-top:4px;font-size:13px}
+
+/* Config bar */
+.config-bar{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px 16px;margin-bottom:24px;font-size:12px;color:#8b949e}
+.config-line{margin-bottom:4px}
+.hint-line{color:#6e7681}
+
+/* TL;DR */
+.tldr{background:#1c2128;border-left:3px solid #58a6ff;padding:12px 16px;border-radius:0 6px 6px 0;margin-bottom:28px;font-size:13px}
+.tldr strong{color:#58a6ff}
+
+/* Section */
+.section{margin-bottom:28px}
+.section-title{font-size:16px;color:#58a6ff;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title .icon{font-size:14px;opacity:.7}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;color:#8b949e;font-weight:500;border-bottom:1px solid #21262d;padding:6px 10px;white-space:nowrap}
+tbody td{padding:6px 10px;border-bottom:1px solid #161b22;vertical-align:top}
+tbody tr:hover{background:#161b22}
+code{background:#1c2128;padding:1px 5px;border-radius:3px;font-size:12px;color:#79c0ff}
+
+/* Tags */
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:500;margin-right:4px}
+.tag-cmd{background:#1f3a5f;color:#58a6ff}
+.tag-data{background:#2a1f3d;color:#d2a8ff}
+.tag-analysis{background:#2d1f1f;color:#ffa657}
+.tag-infra{background:#1a2f1a;color:#7ee787}
+
+/* Command grid */
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;margin-bottom:8px}
+.cmd-card{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px 12px;font-size:12px}
+.cmd-card .cmd{color:#79c0ff;font-weight:600;margin-bottom:2px}
+.cmd-card .desc{color:#8b949e}
+
+/* Architecture diagram */
+.arch{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:16px;font-size:12px;line-height:1.8;overflow-x:auto;white-space:pre;color:#8b949e}
+.arch .highlight{color:#58a6ff}
+.arch .data{color:#d2a8ff}
+.arch .core{color:#ffa657}
+.arch .out{color:#7ee787}
+
+/* Footer */
+.footer{margin-top:32px;padding-top:12px;border-top:1px solid #21262d;font-size:11px;color:#484f58}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="hero">
+  <h1>astock · 已实现功能速查</h1>
+  <p>Rust A股交易助手 · CLI + Chrome Extension · SQLite 持久化</p>
+</div>
+
+<div class="config-bar">
+  <div class="config-line">📋 本次配置 · 受众：自己/备忘 · 终点：操作步骤 · 详略：速读卡（约 3 分钟） · 风格：技术深度</div>
+  <div class="hint-line">💬 觉得短？告诉我「展开 [章节名]」/「加 [架构细节/代码示例]」 · 觉得长？「砍到要点」</div>
+</div>
+
+<div class="tldr">
+  <strong>一句话：</strong>6 条 CLI 命令族 + 5 大技术指标 + 5 个回测策略 + 实时监控告警 + Chrome 插件数据推送，覆盖「查→算→测→记→盯」全链路。
+</div>
+
+<!-- ========== 架构一图 ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">⬡</span> 数据流架构</div>
+  <div class="arch"><span class="data">数据源</span>                        <span class="core">计算层</span>                     <span class="out">输出 / 存储</span>
+─────────────────           ─────────────────          ──────────────────
+东方财富 API ──┐
+  ├ 搜索       │
+  └ 财报基本面  ├───────→ <span class="highlight">CLI 命令族</span> ────────→ 终端表格 (comfy-table)
+腾讯行情 API ──┤         │ search quote kline        红涨绿跌配色
+  ├ 实时报价    │         │ info indicator
+  └ K线(7周期)  │         │ trade position watch
+Chrome 插件 ────┤         │ alert monitor
+  ├ 行情/逐笔   │         │
+  ├ K线/盘口    ├───────→ <span class="core">分析引擎</span> ────────→ SQLite (10张表)
+  ├ 资金流      │         │ MA/MACD/RSI/KDJ/BOLL     ~/.astock/astock.db
+  └ 分时        │         │ 交叉检测 / 综合报告
+               │         │
+               └───────→ <span class="core">回测引擎</span> ────────→ macOS 通知
+                         │ 5策略 T+1 滑点            notify-rust
+                         │ A股费用模型
+                         │
+               ┌───────→ <span class="out">HTTP Receiver</span>
+               │         axum :17320
+               │         8个API端点</div>
+</div>
+
+<!-- ========== 命令速查 ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">⌨</span> CLI 命令速查</div>
+  <div class="cmd-grid">
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-cmd">查</span> astock search &lt;关键词&gt;</div><div class="desc">拼音/代码/名称搜索，-l 限制条数</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-cmd">查</span> astock quote &lt;代码,...&gt;</div><div class="desc">实时报价（逗号分隔多只），红涨绿跌</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-cmd">查</span> astock kline &lt;代码&gt;</div><div class="desc">K线：day/week/month/m5/m15/m30/m60，-c条数 --qfq前复权</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-cmd">查</span> astock info &lt;代码&gt;</div><div class="desc">基本面：EPS/BVPS/ROE/毛利率/净利率/营收YoY/负债率</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-analysis">算</span> astock indicator &lt;all|ma|macd|rsi|kdj|boll&gt; &lt;代码&gt;</div><div class="desc">技术指标计算+解读，-c数据条数</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-analysis">测</span> astock backtest run &lt;代码&gt;</div><div class="desc">-s策略 --capital资金 -c天数，T+1+滑点+A股费用</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-analysis">测</span> astock backtest list-strategies</div><div class="desc">查看 5 个内置策略</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-data">记</span> astock trade add/list/delete/summary</div><div class="desc">交易记录 CRUD + 汇总（佣金/印花税/过户费）</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-data">记</span> astock position add/remove/list</div><div class="desc">持仓管理，list 自动拉实时行情算盈亏</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-data">记</span> astock watch add/remove/list/quote</div><div class="desc">自选股，quote 一键看全部实时行情</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-infra">盯</span> astock alert add/list/remove/history</div><div class="desc">告警规则：price_above/below + MA/MACD/KDJ交叉</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-infra">盯</span> astock monitor start</div><div class="desc">轮询监控，-i间隔，盘中才运行，桌面通知</div></div>
+    <div class="cmd-card"><div class="cmd"><span class="tag tag-infra">盯</span> astock receiver</div><div class="desc">启动 HTTP 接收器，-p端口(默认17320)</div></div>
+  </div>
+</div>
+
+<!-- ========== 回测策略 ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">📊</span> 5 个内置回测策略</div>
+  <table>
+    <thead><tr><th>策略名</th><th>买入信号</th><th>卖出信号</th></tr></thead>
+    <tbody>
+      <tr><td><code>dual_ma</code></td><td>MA5 上穿 MA20（金叉）</td><td>MA5 下穿 MA20（死叉）</td></tr>
+      <tr><td><code>macd_cross</code></td><td>MACD 柱由负转正</td><td>MACD 柱由正转负</td></tr>
+      <tr><td><code>rsi_reversal</code></td><td>RSI 从 30 以下上穿</td><td>RSI 从 70 以上下穿</td></tr>
+      <tr><td><code>kdj_cross</code></td><td>K 线上穿 D 线</td><td>K 线下穿 D 线</td></tr>
+      <tr><td><code>boll_break</code></td><td>价格反弹破下轨</td><td>价格跌破上轨</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:8px;font-size:12px;color:#8b949e">回测费用模型：佣金 0.03%（最低5元）+ 印花税 0.05%（卖出）+ 过户费 0.001%（双向）+ 滑点 0.1%</p>
+</div>
+
+<!-- ========== 告警类型 ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">🔔</span> 告警规则 & 触发源</div>
+  <table>
+    <thead><tr><th>类型</th><th>触发条件</th><th>数据来源</th></tr></thead>
+    <tbody>
+      <tr><td><code>price_above</code></td><td>现价 &gt; 阈值</td><td>实时行情 / Chrome推送</td></tr>
+      <tr><td><code>price_below</code></td><td>现价 &lt; 阈值</td><td>实时行情 / Chrome推送</td></tr>
+      <tr><td><code>ma_cross</code></td><td>MA5/MA10 交叉</td><td>K线数据（≥35条）</td></tr>
+      <tr><td><code>macd_cross</code></td><td>MACD 柱变号</td><td>K线数据（≥35条）</td></tr>
+      <tr><td><code>kdj_cross</code></td><td>K/D 交叉</td><td>K线数据（≥35条）</td></tr>
+      <tr><td><code>RSI超买/超卖</code></td><td>RSI &gt;70 / &lt;30</td><td>K线推送自动检测</td></tr>
+      <tr><td><code>主力资金异动</code></td><td>主力净流入 &gt; 阈值</td><td>资金流推送自动检测</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== 数据模型 ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">🗄</span> 数据层速查</div>
+  <table>
+    <thead><tr><th>数据源</th><th>编码</th><th>关键 API</th></tr></thead>
+    <tbody>
+      <tr><td>东方财富</td><td>UTF-8</td><td>searchapi.eastmoney.com / datacenter.eastmoney.com</td></tr>
+      <tr><td>腾讯行情</td><td>GBK → UTF-8</td><td>qt.gtimg.cn（实时） / ifzq.gtimg.cn（K线）</td></tr>
+      <tr><td>Chrome 插件</td><td>JSON</td><td>POST → localhost:17320/api/v1/*</td></tr>
+    </tbody>
+  </table>
+  <table style="margin-top:12px">
+    <thead><tr><th>SQLite 表</th><th>用途</th><th>主键/唯一</th></tr></thead>
+    <tbody>
+      <tr><td><code>daily_bars</code></td><td>K线缓存</td><td>(code, date)</td></tr>
+      <tr><td><code>trades</code></td><td>交易记录</td><td>id auto</td></tr>
+      <tr><td><code>positions</code></td><td>持仓</td><td>code</td></tr>
+      <tr><td><code>watchlist</code></td><td>自选股</td><td>code</td></tr>
+      <tr><td><code>alert_rules</code> / <code>alerts</code></td><td>告警规则 / 触发历史</td><td>id auto</td></tr>
+      <tr><td><code>tick_trades</code></td><td>逐笔成交</td><td>id auto, tick_id unique</td></tr>
+      <tr><td><code>order_book_snapshots</code></td><td>五档盘口</td><td>id auto</td></tr>
+      <tr><td><code>money_flow</code></td><td>主力/散户资金流</td><td>unique(code, trade_date)</td></tr>
+      <tr><td><code>quote_snapshots</code></td><td>行情快照</td><td>id auto</td></tr>
+      <tr><td><code>timeshare</code></td><td>分时数据</td><td>id auto</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ========== Chrome 插件 API ========== -->
+<div class="section">
+  <div class="section-title"><span class="icon">🔌</span> HTTP Receiver API (Chrome 插件 → CLI)</div>
+  <table>
+    <thead><tr><th>方法</th><th>端点</th><th>功能</th><th>副作用</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td><code>/api/v1/quote</code></td><td>接收实时行情</td><td>存库 + 检查价格告警</td></tr>
+      <tr><td>POST</td><td><code>/api/v1/kline</code></td><td>接收K线批量数据</td><td>存库 + 检查指标告警</td></tr>
+      <tr><td>POST</td><td><code>/api/v1/tick</code></td><td>接收逐笔成交</td><td>存库 (tick_id去重)</td></tr>
+      <tr><td>POST</td><td><code>/api/v1/timeshare</code></td><td>接收分时数据</td><td>存库</td></tr>
+      <tr><td>POST</td><td><code>/api/v1/orderbook</code></td><td>接收五档盘口</td><td>存库</td></tr>
+      <tr><td>POST</td><td><code>/api/v1/moneyflow</code></td><td>接收资金流</td><td>存库 + 检查资金告警</td></tr>
+      <tr><td>GET</td><td><code>/api/v1/status</code></td><td>服务状态</td><td>—</td></tr>
+      <tr><td>GET</td><td><code>/api/v1/watchlist</code></td><td>返回自选股</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:6px;font-size:12px;color:#8b949e">请求格式：<code>{"source":"crx","timestamp":...,"data":{...}}</code></p>
+</div>
+
+<div class="footer">
+  生成时间 2026-05-19 · astock v0.1 · 代码仓库 astock_c_crust
+</div>
+
+</div>
+</body>
+</html>

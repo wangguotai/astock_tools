@@ -38,7 +38,7 @@ function logPush(entry: PushLogEntry) {
 }
 
 // 监听content script消息
-chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const msg = message as CapturedDataMessage | PageStockCodeMessage | PopupMessage;
   if (msg.type === 'CAPTURED_DATA') {
     handleCapturedData(msg.url, msg.body, msg.status);
@@ -54,9 +54,10 @@ chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => {
     sendResponse(memoryLog);
   } else if (msg.type === 'GET_STATUS') {
     checkStatus().then(sendResponse);
-    return true; // 异步响应
+    return true;
   } else if (msg.type === 'GET_CURRENT_CODE') {
-    return getCurrentCode();
+    getCurrentCode().then(sendResponse);
+    return true;
   } else if (msg.type === 'FORCE_PUSH') {
     pushState.lastQuotePush = {};
     pushState.lastOrderbookSnapshot = {};
@@ -68,22 +69,24 @@ chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => {
     getAlertRules().then(sendResponse);
     return true;
   } else if (msg.type === 'ADD_ALERT_RULE') {
-    const rules = await getAlertRules();
-    const newRule = {
-      id: Date.now(),
-      code: msg.code,
-      signal_type: msg.signal_type,
-      params: msg.params,
-      enabled: true,
-    };
-    rules.push(newRule);
-    await setAlertRules(rules);
-    sendResponse({ status: 'ok', rule: newRule });
+    getAlertRules().then(rules => {
+      const newRule = {
+        id: Date.now(),
+        code: msg.code,
+        signal_type: msg.signal_type,
+        params: msg.params,
+        enabled: true,
+      };
+      rules.push(newRule);
+      setAlertRules(rules).then(() => sendResponse({ status: 'ok', rule: newRule }));
+    });
+    return true;
   } else if (msg.type === 'DELETE_ALERT_RULE') {
-    const rules = await getAlertRules();
-    const filtered = rules.filter(r => r.id !== msg.id);
-    await setAlertRules(filtered);
-    sendResponse({ status: 'ok' });
+    getAlertRules().then(rules => {
+      const filtered = rules.filter(r => r.id !== msg.id);
+      setAlertRules(filtered).then(() => sendResponse({ status: 'ok' }));
+    });
+    return true;
   } else if (msg.type === 'GET_ALERT_HISTORY') {
     getAlertHistory().then(sendResponse);
     return true;

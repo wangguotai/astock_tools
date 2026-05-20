@@ -99,6 +99,85 @@ pub enum Commands {
         #[arg(short, long, default_value_t = 17320)]
         port: u16,
     },
+
+    /// 查看融资融券数据
+    Margin {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 20)]
+        days: u32,
+    },
+
+    /// 查看券商研报
+    Research {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 10)]
+        size: u32,
+    },
+
+    /// 查看龙虎榜
+    Dragon {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 10)]
+        size: u32,
+    },
+
+    /// 查看大宗交易
+    Block {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 10)]
+        size: u32,
+    },
+
+    /// 查看高管增减持
+    Insider {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 10)]
+        size: u32,
+    },
+
+    /// 查看限售股解禁
+    Release {
+        /// 股票代码
+        code: String,
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 10)]
+        size: u32,
+    },
+
+    /// 查看机构持仓
+    Institution {
+        /// 股票代码
+        code: String,
+        /// 报告期 (如: 2025-03-31)
+        #[arg(short, long)]
+        date: Option<String>,
+    },
+
+    /// 查看行业景气度
+    Industry {
+        /// 返回数据条数
+        #[arg(short, long, default_value_t = 30)]
+        size: u32,
+    },
+
+    /// 查看历史资金流
+    Moneyflow {
+        /// 股票代码
+        code: String,
+        /// 返回天数
+        #[arg(short, long, default_value_t = 20)]
+        days: u32,
+    },
 }
 
 #[derive(Subcommand)]

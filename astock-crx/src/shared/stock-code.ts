@@ -26,6 +26,10 @@ export function extractCodeFromUrl(url: string): string | null {
 
 /** 从同花顺API URL提取6位代码 */
 export function extractCodeFromApiUrl(url: string): string | null {
-  const match = url.match(/hs_(\d{6})/);
-  return match ? match[1] : null;
+  // stockpage.10jqka.com.cn/spService/002202/Funds/realFunds
+  const spMatch = url.match(/spService\/(\d{6})\//);
+  if (spMatch) return spMatch[1];
+  // d.10jqka.com.cn/.../hs_002202_...
+  const hsMatch = url.match(/hs_(\d{6})/);
+  return hsMatch ? hsMatch[1] : null;
 }

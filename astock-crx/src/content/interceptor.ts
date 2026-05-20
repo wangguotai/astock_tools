@@ -6,12 +6,21 @@
  *   2. 覆写 JSONP 回调函数，捕获响应数据
  *   3. 同时 hook fetch 作为补充（部分请求可能走 fetch）
  */
+const fetchUrlSet = new Set();
+(window as any).fetchUrlSet = fetchUrlSet;
 
-const TARGET_DOMAINS = ['d.10jqka.com.cn', 'push2his.eastmoney.com', 'push2.eastmoney.com', 'qt.gtimg.cn'];
+
+const TARGET_JSONP_DOMAINS = ['d.10jqka.com.cn'];
+const TARGET_FETCH_PATH = ['Funds/realFunds'];
 
 function isTargetUrl(url: string): boolean {
   if (!url) return false;
-  return TARGET_DOMAINS.some((d) => url.includes(d));
+  return TARGET_JSONP_DOMAINS.some((d) => url.includes(d));
+}
+
+function isFetchUrl(url: string): boolean {
+  if(!url) return false;
+  return TARGET_FETCH_PATH.some((d) => url.includes(d));
 }
 
 // ===================== JSONP 拦截 =====================
@@ -158,6 +167,34 @@ document.createElement = function (tagName: string, options?: ElementCreationOpt
   return element;
 } as any;
 
+// ===================== XHR 拦截 =====================
+const _originalXhrOpen = XMLHttpRequest.prototype.open;
+const _originalXhrSend = XMLHttpRequest.prototype.send;
+
+XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
+  (this as any)._astockUrl = typeof url === 'string' ? url : url.href;
+  return _originalXhrOpen.apply(this, [method, url, ...rest] as any);
+};
+
+XMLHttpRequest.prototype.send = function (...args: any[]) {
+  const url = (this as any)._astockUrl;
+  fetchUrlSet.add(url);
+  if (url && isFetchUrl(url)) {
+    this.addEventListener('load', () => {
+      window.postMessage(
+        {
+          type: 'ASTOCK_FETCH_DATA',
+          url,
+          response: this.responseText,
+          status: this.status,
+        },
+        '*',
+      );
+    });
+  }
+  return _originalXhrSend.apply(this, args);
+};
+
 // ===================== fetch 拦截 (补充) =====================
 // 保存原始 fetch，用闭包保护不被覆盖
 
@@ -166,7 +203,8 @@ const _originalFetch = window.fetch.bind(window);
 window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
   const response = await _originalFetch(input, init);
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  if (isTargetUrl(url)) {
+  fetchUrlSet.add(url);
+  if (isFetchUrl(url)) {
     try {
       const cloned = response.clone();
       cloned.text().then((body) => {
@@ -187,4 +225,4 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
   return response;
 };
 
-console.log('[astock] 拦截器已安装 (JSONP + fetch)');
+console.log('[astock] 拦截器已安装 (JSONP + fetch + XHR)');

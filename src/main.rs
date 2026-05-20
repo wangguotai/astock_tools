@@ -17,6 +17,7 @@ use display::table;
 use models::stock::StockCode;
 use rust_decimal::Decimal;
 use std::str::FromStr;
+use chrono::Datelike;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -475,6 +476,201 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Receiver { port } => {
             receiver::start_server(port).await?;
+        }
+
+        Commands::Margin { code, days } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let margins = client.get_margin(&stock_code, days).await?;
+
+            if margins.is_empty() {
+                println!("未获取到融资融券数据");
+            } else {
+                println!("{} 融资融券数据:", stock_code.display_wind());
+                println!("{:<12} {:>14} {:>14} {:>14} {:>14}", "日期", "融资余额(亿)", "融资买入(亿)", "融券余额(亿)", "融券卖出量");
+                let yi = Decimal::from(100000000);
+                for m in &margins {
+                    println!("{:<12} {:>14.2} {:>14.2} {:>14.2} {:>14.0}", m.trade_date, m.fin_balance / yi, m.fin_buy_amt / yi, m.loan_balance / yi, m.loan_sell_vol);
+                }
+            }
+        }
+
+        Commands::Research { code, size } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let reports = client.get_research_reports(&stock_code, size).await?;
+
+            if reports.is_empty() {
+                println!("未获取到研报数据");
+            } else {
+                println!("{} 券商研报:", stock_code.display_wind());
+                for r in &reports {
+                    println!("\n--- {} ({}) ---", r.org_name, r.publish_date);
+                    println!("  评级: {} {}", r.rating, r.rating_change);
+                    if let Some(eps) = r.predict_this_year_eps {
+                        println!("  今年EPS预测: {:.2}", eps);
+                    }
+                    if let Some(eps) = r.predict_next_year_eps {
+                        println!("  明年EPS预测: {:.2}", eps);
+                    }
+                    println!("  标题: {}", r.title);
+                    println!("  研究员: {}", r.researcher);
+                }
+            }
+        }
+
+        Commands::Dragon { code, size } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let entries = client.get_dragon_tiger(&stock_code, size).await?;
+
+            if entries.is_empty() {
+                println!("未获取到龙虎榜数据");
+            } else {
+                println!("{} 龙虎榜:", stock_code.display_wind());
+                for e in &entries {
+                    println!("\n--- {} ({}) ---", e.name, e.trade_date);
+                    println!("  收盘: {:.2}  涨跌幅: {:.2}%", e.close_price, e.change_rate);
+                    println!("  原因: {}", e.explanation);
+                    println!("  买入: {:.2}亿  卖出: {:.2}亿  净买入: {:.2}亿",
+                        e.buy_amt / Decimal::from(100000000),
+                        e.sell_amt / Decimal::from(100000000),
+                        e.net_buy_amt / Decimal::from(100000000));
+                }
+            }
+        }
+
+        Commands::Block { code, size } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let trades = client.get_block_trades(&stock_code, size).await?;
+
+            if trades.is_empty() {
+                println!("未获取到大宗交易数据");
+            } else {
+                println!("{} 大宗交易:", stock_code.display_wind());
+                println!("{:<12} {:>8} {:>12} {:>12} {:>8} {}",
+                    "日期", "成交价", "成交量(股)", "成交额", "溢价率", "买方/卖方");
+                for t in &trades {
+                    let premium = t.premium_ratio.map(|v| format!("{:.2}%", v)).unwrap_or_else(|| "N/A".into());
+                    println!("{:<12} {:>8.2} {:>12.0} {:>12.0} {:>8} {}/{}",
+                        t.trade_date, t.deal_price, t.deal_volume, t.deal_amt, premium, t.buyer_name, t.seller_name);
+                }
+            }
+        }
+
+        Commands::Insider { code, size } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let trades = client.get_insider_trades(&stock_code, size).await?;
+
+            if trades.is_empty() {
+                println!("未获取到高管增减持数据");
+            } else {
+                println!("{} 高管增减持:", stock_code.display_wind());
+                println!("{:<12} {:<10} {:<8} {:>12} {:>8} {}", "截止日期", "变动人", "方向", "变动数量(万)", "比例%", "变动后持股");
+                for t in &trades {
+                    let rate = t.change_rate.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    let after = t.after_holder_num.map(|v| format!("{:.0}", v)).unwrap_or_else(|| "N/A".into());
+                    println!("{:<12} {:<10} {:<8} {:>12.2} {:>8} {}", t.end_date, t.holder_name, t.direction, t.change_num, rate, after);
+                }
+            }
+        }
+
+        Commands::Release { code, size } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let releases = client.get_restricted_releases(&stock_code, size).await?;
+
+            if releases.is_empty() {
+                println!("未获取到限售股解禁数据");
+            } else {
+                println!("{} 限售股解禁:", stock_code.display_wind());
+                println!("{:<12} {:>14} {:>14} {}", "解禁日期", "解禁数量(万股)", "解禁市值(万元)", "类型");
+                for r in &releases {
+                    println!("{:<12} {:>14.2} {:>14.2} {}", r.free_date, r.free_shares, r.free_market_cap, r.free_type);
+                }
+            }
+        }
+
+        Commands::Institution { code, date } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            // 默认取最近一个季报日期
+            let report_date = date.unwrap_or_else(|| {
+                // 简单推导最近季报日
+                let now = chrono::Local::now();
+                let (m, d) = match now.month() {
+                    1..=4 => (12, 31),
+                    5..=7 => (3, 31),
+                    8..=10 => (6, 30),
+                    _ => (9, 30),
+                };
+                let y = if m == 12 { now.year() - 1 } else { now.year() };
+                format!("{:04}-{:02}-{:02}", y, m, d)
+            });
+
+            let holds = client.get_institution_holds(&stock_code, &report_date, 10).await?;
+
+            if holds.is_empty() {
+                println!("未获取到机构持仓数据 (报告期: {})", report_date);
+            } else {
+                println!("{} 机构持仓 (报告期: {}):", stock_code.display_wind(), report_date);
+                println!("{:<10} {:>6} {:>12} {:>12} {:>8} {}",
+                    "机构类型", "家数", "持股数", "持股市值", "流通股%", "变动");
+                for h in &holds {
+                    let ratio = h.free_ratio.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    println!("{:<10} {:>6} {:>12.0} {:>12.0} {:>8} {}",
+                        h.org_type, h.hold_num, h.total_shares, h.hold_value, ratio, h.hold_change);
+                }
+            }
+        }
+
+        Commands::Industry { size } => {
+            let index_data = client.get_industry_index(size).await?;
+            let quotes = client.get_industry_quotes(50).await?;
+
+            if !quotes.is_empty() {
+                println!("行业板块涨跌幅:");
+                println!("{:<12} {:<16} {:>8} {:>8}", "代码", "名称", "涨跌幅%", "涨跌额");
+                for q in &quotes {
+                    let pct = q.change_pct.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    let amt = q.change_amt.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    println!("{:<12} {:<16} {:>8} {:>8}", q.code, q.name, pct, amt);
+                }
+            }
+
+            if !index_data.is_empty() {
+                println!("\n行业景气度指标 (最新):");
+                println!("{:<16} {:<30} {:>10} {:>8} {:>8}", "行业", "指标", "值", "日变动%", "1年变动%");
+                for idx in &index_data {
+                    let cr = idx.change_rate.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    let cr1y = idx.change_rate_1y.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "N/A".into());
+                    println!("{:<16} {:<30} {:>10} {:>8} {:>8}", idx.board_name, idx.indicator_name, idx.indicator_value, cr, cr1y);
+                }
+            }
+
+            if quotes.is_empty() && index_data.is_empty() {
+                println!("未获取到行业数据");
+            }
+        }
+
+        Commands::Moneyflow { code, days } => {
+            let stock_code = StockCode::from_raw(&code)?;
+            let flows = client.get_money_flow_history(&stock_code, days).await?;
+
+            if flows.is_empty() {
+                println!("未获取到资金流数据");
+            } else {
+                // 计算聚合
+                let net_5 = flows.iter().rev().take(5).fold(Decimal::ZERO, |acc, f| acc + f.main_net_inflow);
+                let net_20 = flows.iter().rev().take(20).fold(Decimal::ZERO, |acc, f| acc + f.main_net_inflow);
+                let yi = Decimal::from(100000000);
+
+                println!("{} 资金流向 (近{}日):", stock_code.display_wind(), flows.len());
+                println!("  近5日主力净流入: {:.2}亿", net_5 / yi);
+                println!("  近20日主力净流入: {:.2}亿", net_20 / yi);
+
+                println!("\n{:<12} {:>14} {:>14} {:>14} {:>14}",
+                    "日期", "主力净流入", "小单净流入", "中单净流入", "大单净流入");
+                for f in &flows {
+                    println!("{:<12} {:>14.2} {:>14.2} {:>14.2} {:>14.2}",
+                        f.date, f.main_net_inflow, f.small_net_inflow, f.medium_net_inflow, f.large_net_inflow);
+                }
+            }
         }
     }
 
